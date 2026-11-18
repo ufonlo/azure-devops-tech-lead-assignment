@@ -36,8 +36,9 @@ The workload is described as one containerized API and the team is small. Contai
 ## State and environments
 
 Bootstrap creates one private state container per environment plus a private,
-seven-day `tfplans` container. The plan identity can read both state containers
-but cannot write state; each deployer writes only its own environment state.
+seven-day `tfplans` container. A dedicated pull-request identity can only read
+state. The main-branch plan identity can read state and write saved plans, but
+cannot change state. Each deployer writes only its own environment state.
 Each root module uses a distinct container and key:
 
 - `tfstate-dev/api-platform/dev.tfstate`
@@ -48,10 +49,14 @@ are uploaded directly to Azure Storage instead of becoming GitHub artifacts;
 after environment approval, the production identity downloads and applies that
 exact saved plan.
 
-The `CanNotDelete` lock does not block enabling versioning/retention, creating or
-removing blob containers, or changing data-plane blobs. It does prevent deleting
-or replacing the storage account. Removing the legacy empty `tfstate` container
-in today's migration is therefore not blocked by the lock.
+The `CanNotDelete` lock applies to ARM control-plane operations at the storage
+account scope. With AzureRM 4.x containers use `storage_account_id`, so deleting
+a container through ARM is blocked; inherited account-scope role assignments can
+also fail deletion with `ScopeLocked`. Bootstrap migration therefore needs two
+passes: remove the legacy container and account-scope assignments first, then
+create the lock. Removing an environment or destroying bootstrap later requires
+removing the lock first. Data-plane blob writes remain governed by data-plane
+RBAC, versioning, soft delete, and lifecycle policy.
 
 ## Reliability and cost
 

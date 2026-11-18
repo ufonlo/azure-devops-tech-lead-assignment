@@ -33,7 +33,7 @@ AI_USAGE.md              transparent AI usage log
 4. Merge to `main` deploys development.
 5. Production is a separate workflow_dispatch deployment protected by the GitHub
    `production` environment and required reviewers. It applies the immutable plan
-   previously written to private Azure Storage by the read-only plan identity.
+   previously written to private Azure Storage by the main-branch plan identity.
 
 ## Local validation
 

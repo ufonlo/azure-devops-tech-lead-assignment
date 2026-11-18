@@ -8,13 +8,15 @@
 
 ## 2. Bootstrap Azure once
 
-Authenticate to the subscription recorded in `terraform.tfvars`. Terraform uses
-that explicit value and never relies on the Azure CLI default subscription:
+Keep the personal Azure account isolated from other Azure CLI sessions. Set a
+dedicated Azure CLI profile directory before every `az` or Terraform command.
+Authenticate to the tenant used by the subscription recorded in
+`terraform.tfvars`; Terraform uses that explicit subscription value and never
+relies on the Azure CLI default subscription:
 
 ```bash
-az login
-az account list --output table
-az login --subscription <PERSONAL_SUBSCRIPTION_ID>
+export AZURE_CONFIG_DIR="$HOME/.azure-personal"
+az login --tenant <PERSONAL_TENANT_ID>
 az account show --subscription <PERSONAL_SUBSCRIPTION_ID> \
   --query '{name:name,id:id,tenantId:tenantId,user:user.name}'
 ```
@@ -40,6 +42,7 @@ Set repository variables from bootstrap output:
 |---|---|
 | `AZURE_TENANT_ID` | `github_oidc.tenant_id` |
 | `AZURE_SUBSCRIPTION_ID` | `github_oidc.subscription_id` |
+| `AZURE_PR_CLIENT_ID` | `github_oidc.pr_client_id` |
 | `AZURE_PLAN_CLIENT_ID` | `github_oidc.plan_client_id` |
 | `AZURE_DEV_CLIENT_ID` | `github_oidc.dev_client_id` |
 | `AZURE_PROD_CLIENT_ID` | `github_oidc.prod_client_id` |
