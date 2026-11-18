@@ -39,6 +39,24 @@ resource "azurerm_resource_group" "environment" {
   tags     = merge(var.tags, { environment = each.key })
 }
 
+resource "azurerm_role_definition" "terraform_plan_reader" {
+  name        = "api-platform Terraform Plan Reader"
+  scope       = data.azurerm_subscription.current.id
+  description = "Read Azure resources for Terraform plans, including Container Apps secrets required by the AzureRM provider refresh."
+
+  permissions {
+    actions = [
+      "*/read",
+      "Microsoft.App/containerApps/listSecrets/action",
+    ]
+    not_actions = []
+  }
+
+  assignable_scopes = [
+    for resource_group in azurerm_resource_group.environment : resource_group.id
+  ]
+}
+
 resource "azurerm_storage_account" "state" {
   name                            = "st${replace(var.project_name, "-", "")}${random_string.suffix.result}"
   resource_group_name             = azurerm_resource_group.state.name
@@ -195,17 +213,17 @@ resource "azurerm_role_assignment" "plans_reader" {
 resource "azurerm_role_assignment" "pr_reader" {
   for_each = azurerm_resource_group.environment
 
-  scope                = each.value.id
-  role_definition_name = "Reader"
-  principal_id         = azurerm_user_assigned_identity.github["pr"].principal_id
+  scope              = each.value.id
+  role_definition_id = azurerm_role_definition.terraform_plan_reader.role_definition_resource_id
+  principal_id       = azurerm_user_assigned_identity.github["pr"].principal_id
 }
 
 resource "azurerm_role_assignment" "plan_reader" {
   for_each = azurerm_resource_group.environment
 
-  scope                = each.value.id
-  role_definition_name = "Reader"
-  principal_id         = azurerm_user_assigned_identity.github["plan"].principal_id
+  scope              = each.value.id
+  role_definition_id = azurerm_role_definition.terraform_plan_reader.role_definition_resource_id
+  principal_id       = azurerm_user_assigned_identity.github["plan"].principal_id
 }
 
 resource "azurerm_role_assignment" "deployer_contributor" {

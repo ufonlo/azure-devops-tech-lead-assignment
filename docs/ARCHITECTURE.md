@@ -27,6 +27,10 @@ The workload is described as one containerized API and the team is small. Contai
 - Runtime uses a user-assigned managed identity.
 - `AcrPull` and `Key Vault Secrets User` are granted to runtime; no registry password is exposed.
 - Terraform receives secret identifiers, not secret values.
+- Container Apps must contain Key Vault references only, never plain secret
+  values. The Terraform plan identities can call `listSecrets` because the
+  AzureRM provider requires it during refresh, so values stored directly on a
+  Container App would be exposed to pull-request plans.
 - Production uses a dedicated GitHub environment with required reviewers.
 - State storage disables public blob access, uses Azure RBAC, blob versioning,
   seven-day soft delete, and a `CanNotDelete` account lock.
@@ -36,9 +40,12 @@ The workload is described as one containerized API and the team is small. Contai
 ## State and environments
 
 Bootstrap creates one private state container per environment plus a private,
-seven-day `tfplans` container. A dedicated pull-request identity can only read
-state. The main-branch plan identity can read state and write saved plans, but
-cannot change state. Each deployer writes only its own environment state.
+seven-day `tfplans` container. A dedicated pull-request identity can read state
+and refresh environment resources through the custom `api-platform Terraform
+Plan Reader` role. The role adds only Container Apps `listSecrets` to normal
+Azure control-plane reads. The main-branch plan identity has the same refresh
+access and can write saved plans, but cannot change state. Each deployer writes
+only its own environment state.
 The shared platform root receives a distinct backend container and key at init time for each environment:
 
 - `tfstate-dev/api-platform/dev.tfstate`
