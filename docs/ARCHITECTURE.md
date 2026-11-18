@@ -51,10 +51,11 @@ The shared platform root receives a distinct backend container and key at init t
 - `tfstate-dev/api-platform/dev.tfstate`
 - `tfstate-prod/api-platform/prod.tfstate`
 
-PR plans use `-lock=false` because their identity is read-only. Production plans
-are uploaded directly to Azure Storage instead of becoming GitHub artifacts;
-after environment approval, the production identity downloads and applies that
-exact saved plan.
+PR plans use `-lock=false` because their identity is read-only and their results
+are updated in one sticky PR comment per environment. Main-branch plans are
+uploaded directly to Azure Storage instead of becoming GitHub artifacts. Each
+apply job downloads its environment plan, verifies the published SHA-256 and
+applies it without recalculating; production first waits for environment approval.
 
 The `CanNotDelete` lock applies to ARM control-plane operations at the storage
 account scope. With AzureRM 4.x containers use `storage_account_id`, so deleting

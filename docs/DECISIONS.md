@@ -16,19 +16,19 @@
 
 ## ADR-003 — One module, isolated states
 
-**Decision:** compose dev and prod from one versioned module while keeping
-separate roots, state containers, identities and GitHub environments.
+**Decision:** compose environments from one shared root and versioned module,
+while keeping separate tfvars, state containers, identities and GitHub environments.
 
 **Reason:** consistency without coupling lifecycle or permissions.
 
 ## ADR-005 — Approved plans stay in Azure Storage
 
-**Decision:** upload production saved plans to a private `tfplans` container,
-expire them after seven days, and let the production identity read but not write
-them.
+**Decision:** upload main-branch saved plans to a private `tfplans` container,
+expire current and historical versions after seven days, and let each deployer
+read but not write them.
 
-**Reason:** apply uses exactly the reviewed plan without exposing potentially
-sensitive plan values as GitHub artifacts.
+**Reason:** apply verifies the plan checksum and uses exactly the planned file
+without exposing potentially sensitive plan values as GitHub artifacts.
 
 ## ADR-004 — Secrets by reference
 

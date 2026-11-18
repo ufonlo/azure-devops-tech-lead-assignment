@@ -34,7 +34,16 @@ Bootstrap is intentionally a separate, one-time administrative step. Store its s
 
 ## 3. Configure GitHub
 
-Create environments named exactly `development` and `production`. Add at least one required reviewer to production.
+Create environments named exactly `development` and `production`:
+
+- `development`: no required reviewer; set environment variable
+  `AZURE_CLIENT_ID` from `github_oidc.dev_client_id`.
+- `production`: add at least one required reviewer, prevent self-review, restrict
+  deployments to the `main` branch and set environment variable
+  `AZURE_CLIENT_ID` from `github_oidc.prod_client_id`.
+
+Do not create repository-level dev or prod client ID variables. The apply jobs
+read the same `AZURE_CLIENT_ID` name from their selected GitHub Environment.
 
 Set repository variables from bootstrap output:
 
@@ -44,28 +53,38 @@ Set repository variables from bootstrap output:
 | `AZURE_SUBSCRIPTION_ID` | `github_oidc.subscription_id` |
 | `AZURE_PR_CLIENT_ID` | `github_oidc.pr_client_id` |
 | `AZURE_PLAN_CLIENT_ID` | `github_oidc.plan_client_id` |
-| `AZURE_DEV_CLIENT_ID` | `github_oidc.dev_client_id` |
-| `AZURE_PROD_CLIENT_ID` | `github_oidc.prod_client_id` |
 | `TF_STATE_RESOURCE_GROUP` | `backend.resource_group_name` |
 | `TF_STATE_STORAGE_ACCOUNT` | `backend.storage_account_name` |
 
-State container names are fixed by environment: `tfstate-dev` and
-`tfstate-prod`. Approved production plans are stored in the private `tfplans`
-container and expire after seven days.
+State container names are derived as `tfstate-<environment>` and state keys as
+`api-platform/<environment>.tfstate`. Plans for main deployments are stored in
+the private `tfplans` container, checksum-verified before apply and removed by
+the seven-day lifecycle rule. Plan binaries are never uploaded as GitHub
+artifacts.
 
 These are identifiers, not credentials. No GitHub secret is required for Azure login.
 
-Protect `main`: require pull requests, one approval, resolved conversations, CODEOWNERS review and the Terraform checks.
+Protect `main`: require pull requests, one approval, resolved conversations,
+CODEOWNERS review and the Terraform checks. Allow GitHub Actions to create PR
+comments; the reusable comment job is the only job granted
+`pull-requests: write`.
 
 ## 4. First change
 
 1. Create a feature branch.
 2. Change one low-risk tag or module input.
-3. Open a PR and inspect both read-only (`-lock=false`) plans and the Trivy result.
+3. Open a PR and inspect both sticky, read-only (`-lock=false`) plan comments
+   plus the fmt, validate, TFLint and Trivy checks. Fork PRs run only static
+   checks because GitHub does not issue their jobs a trusted Azure OIDC token.
 4. Merge only after the plan is understood.
-5. Confirm development deploys automatically.
-6. Run the production workflow manually and verify approval is requested before
-   the exact plan stored in `tfplans` is downloaded and applied.
+5. Confirm main plans and applies development, then plans production.
+6. Approve the `production` environment and verify that the exact plan stored
+   in `tfplans` is downloaded, checksum-verified and applied without re-planning.
+
+To add another environment, add `envs/<name>.tfvars`, add the environment to
+the bootstrap `environments` map, create its GitHub Environment with an
+`AZURE_CLIENT_ID` variable, then add one reusable-workflow call to both the PR
+and main workflows. No new workflow file is required.
 
 ## 5. Team conventions for humans and AI
 

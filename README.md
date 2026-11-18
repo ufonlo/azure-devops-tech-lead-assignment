@@ -27,12 +27,12 @@ AI_USAGE.md              transparent AI usage log
 
 1. A feature branch opens a pull request.
 2. CI runs formatting, validation, lint/security checks and environment plans.
-3. Plan summaries are attached to the workflow summary for review before merge;
+3. One sticky PR comment per environment is created or updated with its plan;
    binary plans are never uploaded as GitHub artifacts.
-4. Merge to `main` deploys development.
-5. Production is a separate workflow_dispatch deployment protected by the GitHub
-   `production` environment and required reviewers. It applies the immutable plan
-   previously written to private Azure Storage by the main-branch plan identity.
+4. Merge to `main` plans and applies development, then creates the production plan.
+5. The same run pauses at the protected GitHub `production` environment. After a
+   required reviewer approves it, production verifies the saved plan checksum and
+   applies that exact plan without recalculating it.
 
 ## Local validation
 
