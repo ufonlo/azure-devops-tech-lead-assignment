@@ -28,13 +28,10 @@ jobs:
         run: |
           terraform -chdir=infrastructure/bootstrap init -backend=false -input=false
           terraform -chdir=infrastructure/bootstrap validate
-      - name: Validate environments
-        shell: bash
+      - name: Validate platform
         run: |
-          for environment in dev prod; do
-            terraform -chdir="infrastructure/environments/${environment}" init -backend=false -input=false
-            terraform -chdir="infrastructure/environments/${environment}" validate
-          done
+          terraform -chdir=infrastructure/platform init -backend=false -input=false
+          terraform -chdir=infrastructure/platform validate
       - name: Scan Terraform configuration
         uses: aquasecurity/trivy-action@0.28.0
         with:
@@ -63,7 +60,7 @@ jobs:
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
       - name: Initialize remote state
         run: |
-          terraform -chdir="infrastructure/environments/${{ matrix.environment }}" init -input=false \
+          terraform -chdir=infrastructure/platform init -input=false \
             -backend-config="resource_group_name=${{ vars.TF_STATE_RESOURCE_GROUP }}" \
             -backend-config="storage_account_name=${{ vars.TF_STATE_STORAGE_ACCOUNT }}" \
             -backend-config="container_name=tfstate-${{ matrix.environment }}" \
@@ -72,10 +69,11 @@ jobs:
             -backend-config="use_azuread_auth=true"
       - name: Create plan
         run: |
-          terraform -chdir="infrastructure/environments/${{ matrix.environment }}" plan \
+          terraform -chdir=infrastructure/platform plan \
             -input=false \
             -lock=false \
             -no-color \
+            -var-file="envs/${{ matrix.environment }}.tfvars" \
             -var="subscription_id=${{ vars.AZURE_SUBSCRIPTION_ID }}" \
             -out="${{ runner.temp }}/${{ matrix.environment }}.tfplan" \
             | tee "${{ runner.temp }}/${{ matrix.environment }}.txt"

@@ -34,14 +34,15 @@ jobs:
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
       - name: Plan production
         run: |
-          terraform -chdir=infrastructure/environments/prod init -input=false \
+          terraform -chdir=infrastructure/platform init -input=false \
             -backend-config="resource_group_name=${{ vars.TF_STATE_RESOURCE_GROUP }}" \
             -backend-config="storage_account_name=${{ vars.TF_STATE_STORAGE_ACCOUNT }}" \
             -backend-config="container_name=tfstate-prod" \
             -backend-config="key=api-platform/prod.tfstate" \
             -backend-config="use_oidc=true" \
             -backend-config="use_azuread_auth=true"
-          terraform -chdir=infrastructure/environments/prod plan -input=false -no-color \
+          terraform -chdir=infrastructure/platform plan -input=false -no-color \
+            -var-file=envs/prod.tfvars \
             -var="subscription_id=${{ vars.AZURE_SUBSCRIPTION_ID }}" -out=prod.tfplan \
             | tee "${{ runner.temp }}/prod.txt"
       - name: Define immutable plan location
@@ -49,7 +50,7 @@ jobs:
         shell: bash
         run: |
           echo "blob_name=production/${GITHUB_SHA}/${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.tfplan" >> "$GITHUB_OUTPUT"
-          echo "sha256=$(sha256sum infrastructure/environments/prod/prod.tfplan | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+          echo "sha256=$(sha256sum infrastructure/platform/prod.tfplan | awk '{print $1}')" >> "$GITHUB_OUTPUT"
       - name: Upload plan to private Azure Storage
         run: |
           az storage blob upload \
@@ -57,7 +58,7 @@ jobs:
             --account-name "${{ vars.TF_STATE_STORAGE_ACCOUNT }}" \
             --container-name tfplans \
             --name "${{ steps.plan-reference.outputs.blob_name }}" \
-            --file infrastructure/environments/prod/prod.tfplan \
+            --file infrastructure/platform/prod.tfplan \
             --overwrite false
       - name: Publish plan summary
         run: |
@@ -85,7 +86,7 @@ jobs:
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
       - name: Initialize production state
         run: |
-          terraform -chdir=infrastructure/environments/prod init -input=false \
+          terraform -chdir=infrastructure/platform init -input=false \
             -backend-config="resource_group_name=${{ vars.TF_STATE_RESOURCE_GROUP }}" \
             -backend-config="storage_account_name=${{ vars.TF_STATE_STORAGE_ACCOUNT }}" \
             -backend-config="container_name=tfstate-prod" \
@@ -99,13 +100,13 @@ jobs:
             --account-name "${{ vars.TF_STATE_STORAGE_ACCOUNT }}" \
             --container-name tfplans \
             --name "${{ needs.plan.outputs.plan_blob }}" \
-            --file infrastructure/environments/prod/prod.tfplan \
+            --file infrastructure/platform/prod.tfplan \
             --overwrite true
       - name: Verify the approved plan checksum
         shell: bash
         run: |
-          echo "${{ needs.plan.outputs.plan_sha256 }}  infrastructure/environments/prod/prod.tfplan" | sha256sum --check --strict
+          echo "${{ needs.plan.outputs.plan_sha256 }}  infrastructure/platform/prod.tfplan" | sha256sum --check --strict
       - name: Apply the approved plan
         run: |
-          terraform -chdir=infrastructure/environments/prod apply -input=false -auto-approve prod.tfplan
+          terraform -chdir=infrastructure/platform apply -input=false -auto-approve prod.tfplan
 

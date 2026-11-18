@@ -31,14 +31,15 @@ jobs:
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
       - name: Init, plan and apply development
         run: |
-          terraform -chdir=infrastructure/environments/dev init -input=false \
+          terraform -chdir=infrastructure/platform init -input=false \
             -backend-config="resource_group_name=${{ vars.TF_STATE_RESOURCE_GROUP }}" \
             -backend-config="storage_account_name=${{ vars.TF_STATE_STORAGE_ACCOUNT }}" \
             -backend-config="container_name=tfstate-dev" \
             -backend-config="key=api-platform/dev.tfstate" \
             -backend-config="use_oidc=true" \
             -backend-config="use_azuread_auth=true"
-          terraform -chdir=infrastructure/environments/dev plan -input=false \
+          terraform -chdir=infrastructure/platform plan -input=false \
+            -var-file=envs/dev.tfvars \
             -var="subscription_id=${{ vars.AZURE_SUBSCRIPTION_ID }}" -out=dev.tfplan
-          terraform -chdir=infrastructure/environments/dev apply -input=false -auto-approve dev.tfplan
+          terraform -chdir=infrastructure/platform apply -input=false -auto-approve dev.tfplan
 
