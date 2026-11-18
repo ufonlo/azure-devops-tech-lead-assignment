@@ -1,0 +1,31 @@
+variable "subscription_id" {
+  description = "Personal Azure subscription ID used for the assignment."
+  type        = string
+}
+
+variable "location" {
+  description = "Primary Azure region."
+  type        = string
+  default     = "northeurope"
+}
+
+variable "project_name" {
+  description = "Short lowercase project name used in resource names."
+  type        = string
+  default     = "api-platform"
+}
+
+variable "github_repository" {
+  description = "GitHub repository in owner/name form."
+  type        = string
+}
+
+variable "tags" {
+  description = "Common resource tags."
+  type        = map(string)
+  default = {
+    managed-by = "terraform"
+    project    = "devops-tech-lead-assignment"
+  }
+}
+
