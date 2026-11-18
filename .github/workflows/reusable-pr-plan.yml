@@ -1,0 +1,95 @@
+name: Reusable Terraform PR plan
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: Environment name matching envs/<name>.tfvars
+        required: true
+        type: string
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      comment: ${{ steps.comment.outputs.body }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: 1.9.8
+      - name: Sign in with the PR identity
+        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0
+        with:
+          client-id: ${{ vars.AZURE_PR_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Initialize ${{ inputs.environment }} state
+        run: |
+          terraform -chdir=infrastructure/platform init -input=false \
+            -backend-config="resource_group_name=${{ vars.TF_STATE_RESOURCE_GROUP }}" \
+            -backend-config="storage_account_name=${{ vars.TF_STATE_STORAGE_ACCOUNT }}" \
+            -backend-config="container_name=tfstate-${{ inputs.environment }}" \
+            -backend-config="key=api-platform/${{ inputs.environment }}.tfstate" \
+            -backend-config="use_oidc=true" \
+            -backend-config="use_azuread_auth=true"
+      - name: Create ${{ inputs.environment }} plan
+        id: plan
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          terraform -chdir=infrastructure/platform plan \
+            -input=false \
+            -lock=false \
+            -no-color \
+            -var-file="envs/${{ inputs.environment }}.tfvars" \
+            -var="subscription_id=${{ vars.AZURE_SUBSCRIPTION_ID }}" \
+            -out="${{ runner.temp }}/${{ inputs.environment }}.tfplan" \
+            2>&1 | tee "${{ runner.temp }}/${{ inputs.environment }}.txt"
+      - name: Prepare sticky comment
+        id: comment
+        shell: bash
+        env:
+          PLAN_OUTCOME: ${{ steps.plan.outcome }}
+        run: |
+          {
+            echo 'body<<TERRAFORM_PLAN_COMMENT'
+            echo "## Terraform plan: \`${{ inputs.environment }}\`"
+            echo
+            echo "Result: **${PLAN_OUTCOME}**"
+            echo
+            echo '<details><summary>Show plan output</summary>'
+            echo
+            echo '```text'
+            tail -n 200 "${{ runner.temp }}/${{ inputs.environment }}.txt" 2>/dev/null || echo "Plan output was not produced."
+            echo '```'
+            echo '</details>'
+            echo 'TERRAFORM_PLAN_COMMENT'
+          } >> "$GITHUB_OUTPUT"
+      - name: Fail when Terraform plan failed
+        if: steps.plan.outcome != 'success'
+        run: exit 1
+
+  comment:
+    needs: plan
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Update ${{ inputs.environment }} plan comment
+        uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
+        with:
+          header: terraform-plan-${{ inputs.environment }}
+          message: ${{ needs.plan.outputs.comment }}
+          recreate: true
+      - name: Fail when Terraform plan failed
+        if: needs.plan.result != 'success'
+        run: exit 1
