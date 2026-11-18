@@ -20,6 +20,21 @@ variable "github_repository" {
   type        = string
 }
 
+variable "environments" {
+  description = "Deployment environments keyed by their stable Terraform resource key."
+  type = map(object({
+    github_environment = string
+  }))
+  default = {
+    dev = {
+      github_environment = "development"
+    }
+    prod = {
+      github_environment = "production"
+    }
+  }
+}
+
 variable "tags" {
   description = "Common resource tags."
   type        = map(string)
