@@ -28,16 +28,30 @@ The workload is described as one containerized API and the team is small. Contai
 - `AcrPull` and `Key Vault Secrets User` are granted to runtime; no registry password is exposed.
 - Terraform receives secret identifiers, not secret values.
 - Production uses a dedicated GitHub environment with required reviewers.
-- State storage disables public blob access and uses Azure RBAC.
+- State storage disables public blob access, uses Azure RBAC, blob versioning,
+  seven-day soft delete, and a `CanNotDelete` account lock.
+- Deployment identities may delegate only `AcrPull` and `Key Vault Secrets User`;
+  the RBAC administrator assignment is constrained with an Azure ABAC condition.
 
 ## State and environments
 
-Bootstrap creates a private state storage account/container plus environment resource groups and deployment identities. Each root module uses a distinct key:
+Bootstrap creates one private state container per environment plus a private,
+seven-day `tfplans` container. The plan identity can read both state containers
+but cannot write state; each deployer writes only its own environment state.
+Each root module uses a distinct container and key:
 
-- `job-radar/dev.tfstate`
-- `job-radar/prod.tfstate`
+- `tfstate-dev/api-platform/dev.tfstate`
+- `tfstate-prod/api-platform/prod.tfstate`
 
-State locking is handled by the AzureRM backend. Production and development never share a root state.
+PR plans use `-lock=false` because their identity is read-only. Production plans
+are uploaded directly to Azure Storage instead of becoming GitHub artifacts;
+after environment approval, the production identity downloads and applies that
+exact saved plan.
+
+The `CanNotDelete` lock does not block enabling versioning/retention, creating or
+removing blob containers, or changing data-plane blobs. It does prevent deleting
+or replacing the storage account. Removing the legacy empty `tfstate` container
+in today's migration is therefore not blocked by the lock.
 
 ## Reliability and cost
 

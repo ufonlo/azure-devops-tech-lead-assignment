@@ -8,13 +8,15 @@
 
 ## 2. Bootstrap Azure once
 
-Confirm the active subscription before every apply:
+Authenticate to the subscription recorded in `terraform.tfvars`. Terraform uses
+that explicit value and never relies on the Azure CLI default subscription:
 
 ```bash
 az login
 az account list --output table
-az account set --subscription <PERSONAL_SUBSCRIPTION_ID>
-az account show --query '{name:name,id:id,tenantId:tenantId,user:user.name}'
+az login --subscription <PERSONAL_SUBSCRIPTION_ID>
+az account show --subscription <PERSONAL_SUBSCRIPTION_ID> \
+  --query '{name:name,id:id,tenantId:tenantId,user:user.name}'
 ```
 
 Copy `infrastructure/bootstrap/terraform.tfvars.example` to `terraform.tfvars`, replace the subscription ID and `OWNER/REPOSITORY`, then run:
@@ -43,7 +45,10 @@ Set repository variables from bootstrap output:
 | `AZURE_PROD_CLIENT_ID` | `github_oidc.prod_client_id` |
 | `TF_STATE_RESOURCE_GROUP` | `backend.resource_group_name` |
 | `TF_STATE_STORAGE_ACCOUNT` | `backend.storage_account_name` |
-| `TF_STATE_CONTAINER` | `backend.container_name` |
+
+State container names are fixed by environment: `tfstate-dev` and
+`tfstate-prod`. Approved production plans are stored in the private `tfplans`
+container and expire after seven days.
 
 These are identifiers, not credentials. No GitHub secret is required for Azure login.
 
@@ -53,10 +58,11 @@ Protect `main`: require pull requests, one approval, resolved conversations, COD
 
 1. Create a feature branch.
 2. Change one low-risk tag or module input.
-3. Open a PR and inspect both plans and the Trivy result.
+3. Open a PR and inspect both read-only (`-lock=false`) plans and the Trivy result.
 4. Merge only after the plan is understood.
 5. Confirm development deploys automatically.
-6. Run the production workflow manually and verify approval is requested before apply.
+6. Run the production workflow manually and verify approval is requested before
+   the exact plan stored in `tfplans` is downloaded and applied.
 
 ## 5. Team conventions for humans and AI
 
