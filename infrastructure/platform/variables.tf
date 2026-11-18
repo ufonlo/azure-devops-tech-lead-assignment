@@ -38,7 +38,7 @@ variable "container_image" {
 variable "require_pinned_image" {
   type        = bool
   description = "Require container_image to use an immutable sha256 digest for this environment."
-  default     = false
+  default     = true
 }
 
 variable "min_replicas" {

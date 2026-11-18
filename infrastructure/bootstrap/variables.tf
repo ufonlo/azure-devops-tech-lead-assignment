@@ -29,6 +29,7 @@ variable "environments" {
   default = {
     dev = {
       github_environment = "development"
+      tfplans_reader     = true
     }
     prod = {
       github_environment = "production"

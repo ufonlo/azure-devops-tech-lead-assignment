@@ -1,0 +1,41 @@
+name: Deploy platform
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "infrastructure/**"
+      - ".github/workflows/**"
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: Change or release being re-run
+        required: false
+        default: Manual re-run
+        type: string
+
+concurrency:
+  group: deploy-platform-main
+  cancel-in-progress: false
+
+jobs:
+  deploy-dev:
+    uses: ./.github/workflows/reusable-deploy-environment.yml
+    with:
+      environment: dev
+      github_environment: development
+      reason: ${{ inputs.reason || format('Main commit {0}', github.sha) }}
+    permissions:
+      contents: read
+      id-token: write
+
+  deploy-prod:
+    needs: deploy-dev
+    uses: ./.github/workflows/reusable-deploy-environment.yml
+    with:
+      environment: prod
+      github_environment: production
+      reason: ${{ inputs.reason || format('Main commit {0}', github.sha) }}
+    permissions:
+      contents: read
+      id-token: write
