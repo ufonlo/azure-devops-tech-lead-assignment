@@ -27,12 +27,18 @@ variable "location" {
 
 variable "container_image" {
   type        = string
-  description = "Full container image reference. Production must use an immutable sha256 digest."
+  description = "Full container image reference. Environments that require immutable images must use a sha256 digest."
 
   validation {
-    condition     = var.environment != "prod" || can(regex("@sha256:[0-9a-f]{64}$", var.container_image))
-    error_message = "Production container_image must be pinned with @sha256:<64 lowercase hexadecimal characters>."
+    condition     = !var.require_pinned_image || can(regex("@sha256:[0-9a-f]{64}$", var.container_image))
+    error_message = "container_image must be pinned with @sha256:<64 lowercase hexadecimal characters> when require_pinned_image is true."
   }
+}
+
+variable "require_pinned_image" {
+  type        = bool
+  description = "Require container_image to use an immutable sha256 digest for this environment."
+  default     = false
 }
 
 variable "min_replicas" {
