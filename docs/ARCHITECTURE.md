@@ -39,7 +39,7 @@ Bootstrap creates one private state container per environment plus a private,
 seven-day `tfplans` container. A dedicated pull-request identity can only read
 state. The main-branch plan identity can read state and write saved plans, but
 cannot change state. Each deployer writes only its own environment state.
-Each root module uses a distinct container and key:
+The shared platform root receives a distinct backend container and key at init time for each environment:
 
 - `tfstate-dev/api-platform/dev.tfstate`
 - `tfstate-prod/api-platform/prod.tfstate`

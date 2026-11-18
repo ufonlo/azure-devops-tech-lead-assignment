@@ -19,8 +19,7 @@ docs/                    architecture, onboarding, work plan and CTO summary
 infrastructure/
   bootstrap/             one-time state and OIDC bootstrap
   modules/api-platform/  reusable application platform module
-  environments/dev/      development composition
-  environments/prod/     production composition
+  platform/              shared environment root and per-environment tfvars
 AI_USAGE.md              transparent AI usage log
 ```
 
@@ -39,10 +38,8 @@ AI_USAGE.md              transparent AI usage log
 
 ```bash
 terraform fmt -check -recursive infrastructure
-terraform -chdir=infrastructure/environments/dev init -backend=false
-terraform -chdir=infrastructure/environments/dev validate
-terraform -chdir=infrastructure/environments/prod init -backend=false
-terraform -chdir=infrastructure/environments/prod validate
+terraform -chdir=infrastructure/platform init -backend=false
+terraform -chdir=infrastructure/platform validate
 ```
 
 No Azure resources are required for static validation. See [day-one setup](docs/DAY_ONE.md) before running a real plan.
