@@ -72,11 +72,11 @@ resource "azurerm_user_assigned_identity" "github" {
 resource "azurerm_federated_identity_credential" "github" {
   for_each = local.federations
 
-  name      = "github-${each.key}"
-  parent_id = azurerm_user_assigned_identity.github[each.value.identity].id
-  audience  = ["api://AzureADTokenExchange"]
-  issuer    = "https://token.actions.githubusercontent.com"
-  subject   = each.value.subject
+  name                      = "github-${each.key}"
+  user_assigned_identity_id = azurerm_user_assigned_identity.github[each.value.identity].id
+  audience                  = ["api://AzureADTokenExchange"]
+  issuer                    = "https://token.actions.githubusercontent.com"
+  subject                   = each.value.subject
 }
 
 resource "azurerm_role_assignment" "state" {
