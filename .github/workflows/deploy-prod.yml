@@ -21,6 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       plan_blob: ${{ steps.plan-reference.outputs.blob_name }}
+      plan_sha256: ${{ steps.plan-reference.outputs.sha256 }}
     steps:
       - uses: actions/checkout@v4
       - uses: hashicorp/setup-terraform@v3
@@ -48,7 +49,8 @@ jobs:
         shell: bash
         run: |
           echo "blob_name=production/${GITHUB_SHA}/${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.tfplan" >> "$GITHUB_OUTPUT"
-      - name: Upload encrypted plan to Azure Storage
+          echo "sha256=$(sha256sum infrastructure/environments/prod/prod.tfplan | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+      - name: Upload plan to private Azure Storage
         run: |
           az storage blob upload \
             --auth-mode login \
@@ -99,6 +101,10 @@ jobs:
             --name "${{ needs.plan.outputs.plan_blob }}" \
             --file infrastructure/environments/prod/prod.tfplan \
             --overwrite true
+      - name: Verify the approved plan checksum
+        shell: bash
+        run: |
+          echo "${{ needs.plan.outputs.plan_sha256 }}  infrastructure/environments/prod/prod.tfplan" | sha256sum --check --strict
       - name: Apply the approved plan
         run: |
           terraform -chdir=infrastructure/environments/prod apply -input=false -auto-approve prod.tfplan

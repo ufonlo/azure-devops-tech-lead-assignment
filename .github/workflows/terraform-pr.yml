@@ -58,7 +58,7 @@ jobs:
       - name: Sign in to Azure through GitHub OIDC
         uses: azure/login@v2
         with:
-          client-id: ${{ vars.AZURE_PLAN_CLIENT_ID }}
+          client-id: ${{ vars.AZURE_PR_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
       - name: Initialize remote state
