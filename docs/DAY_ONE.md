@@ -21,7 +21,18 @@ az account show --subscription <PERSONAL_SUBSCRIPTION_ID> \
   --query '{name:name,id:id,tenantId:tenantId,user:user.name}'
 ```
 
-Copy `infrastructure/bootstrap/terraform.tfvars.example` to `terraform.tfvars`, replace the subscription ID and `OWNER/REPOSITORY`, then run:
+Copy `infrastructure/bootstrap/terraform.tfvars.example` to `terraform.tfvars`,
+then replace the subscription ID, `OWNER/REPOSITORY`, immutable owner ID and
+immutable repository ID. Read both public GitHub IDs with either:
+
+```bash
+gh api repos/OWNER/REPOSITORY --jq '.owner.id, .id'
+```
+
+or request the public REST endpoint
+`https://api.github.com/repos/OWNER/REPOSITORY` and read `owner.id` and the
+top-level `id`. Keep `github_repository` in owner/name form; bootstrap combines
+it with the numeric IDs for immutable OIDC subjects. Then run:
 
 ```bash
 terraform -chdir=infrastructure/bootstrap init

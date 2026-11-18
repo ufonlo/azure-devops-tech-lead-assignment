@@ -23,7 +23,8 @@ The workload is described as one containerized API and the team is small. Contai
 
 ## Security boundaries
 
-- GitHub authenticates with federated OIDC subjects scoped to repository, branch/pull request and GitHub environment.
+- GitHub authenticates with immutable, numeric-owner/repository OIDC subjects
+  scoped to the pull request, `main` branch or GitHub environment.
 - Runtime uses a user-assigned managed identity.
 - `AcrPull` and `Key Vault Secrets User` are granted to runtime; no registry password is exposed.
 - Terraform receives secret identifiers, not secret values.

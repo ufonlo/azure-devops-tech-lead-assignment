@@ -129,20 +129,22 @@ resource "azurerm_management_lock" "state" {
 }
 
 locals {
-  identities = toset(concat(["pr", "plan"], keys(var.environments)))
+  identities                  = toset(concat(["pr", "plan"], keys(var.environments)))
+  github_repository_parts     = split("/", var.github_repository)
+  github_immutable_repository = "${local.github_repository_parts[0]}@${var.github_owner_id}/${local.github_repository_parts[1]}@${var.github_repository_id}"
   federations = merge({
     pr = {
       identity = "pr"
-      subject  = "repo:${var.github_repository}:pull_request"
+      subject  = "repo:${local.github_immutable_repository}:pull_request"
     }
     plan-main = {
       identity = "plan"
-      subject  = "repo:${var.github_repository}:ref:refs/heads/main"
+      subject  = "repo:${local.github_immutable_repository}:ref:refs/heads/main"
     }
     }, {
     for environment, config in var.environments : environment => {
       identity = environment
-      subject  = "repo:${var.github_repository}:environment:${config.github_environment}"
+      subject  = "repo:${local.github_immutable_repository}:environment:${config.github_environment}"
     }
   })
 

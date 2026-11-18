@@ -92,11 +92,31 @@ jobs:
       contents: read
       pull-requests: write
     steps:
+      - name: Prepare plan comment message
+        id: message
+        shell: bash
+        env:
+          ENVIRONMENT_NAME: ${{ inputs.environment }}
+          PLAN_COMMENT: ${{ needs.plan.outputs.comment }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          delimiter="PLAN_COMMENT_$(date +%s)_${RANDOM}"
+          {
+            echo "body<<${delimiter}"
+            if [[ -n "${PLAN_COMMENT}" ]]; then
+              printf '%s\n' "${PLAN_COMMENT}"
+            else
+              echo "## Terraform plan: \`${ENVIRONMENT_NAME}\`"
+              echo
+              echo "The plan did not complete, so no Terraform output was produced. [Open the workflow run](${RUN_URL}) for the failing step."
+            fi
+            echo "${delimiter}"
+          } >> "${GITHUB_OUTPUT}"
       - name: Update ${{ inputs.environment }} plan comment
         uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
         with:
           header: terraform-plan-${{ inputs.environment }}
-          message: ${{ needs.plan.outputs.comment }}
+          message: ${{ steps.message.outputs.body }}
           recreate: true
       - name: Fail when Terraform plan failed
         if: needs.plan.result != 'success'

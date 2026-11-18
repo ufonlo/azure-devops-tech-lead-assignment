@@ -64,3 +64,19 @@ use a storage private endpoint, or use GitHub-hosted runners with GitHub's Azure
 private networking, before disabling public network access and changing the
 storage firewall default action to deny.
 
+## ADR-008 — Immutable GitHub OIDC subjects
+
+**Decision:** federated credentials use GitHub's immutable subject format,
+`repo:owner@owner_id/repository@repository_id:<context>`, for pull requests, the
+`main` branch and deployment environments. The human-readable owner/name remains
+an independent bootstrap input for repository configuration and documentation.
+
+**Reason:** numeric owner and repository IDs survive repository renames and prevent
+a deleted repository name from being re-created and trusted by the existing Azure
+federation. This repository was created after GitHub enabled immutable OIDC
+subjects by default, so name-based Azure subjects do not match its tokens.
+
+**Trade-off:** bootstrap requires two additional public identifiers. They can be
+read through `gh api` or GitHub's unauthenticated public repository REST endpoint
+and are safe to store in the non-secret Terraform configuration.
+
