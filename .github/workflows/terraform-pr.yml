@@ -35,10 +35,11 @@ jobs:
           terraform -chdir=infrastructure/platform init -backend=false -input=false
           terraform -chdir=infrastructure/platform validate
       - name: Run TFLint
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
-          tflint --init
-          tflint --chdir=infrastructure/bootstrap
-          tflint --chdir=infrastructure/platform
+          tflint --recursive --init --config "$GITHUB_WORKSPACE/.tflint.hcl"
+          tflint --recursive --config "$GITHUB_WORKSPACE/.tflint.hcl"
       - name: Scan Terraform configuration
         uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # 0.35.0
         with:
@@ -49,7 +50,7 @@ jobs:
 
   plan-dev:
     needs: static-checks
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]'
     uses: ./.github/workflows/reusable-pr-plan.yml
     with:
       environment: dev
@@ -60,7 +61,7 @@ jobs:
 
   plan-prod:
     needs: static-checks
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]'
     uses: ./.github/workflows/reusable-pr-plan.yml
     with:
       environment: prod

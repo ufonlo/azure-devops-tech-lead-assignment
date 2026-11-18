@@ -40,49 +40,67 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
       - name: Initialize ${{ inputs.environment }} state
+        env:
+          ENVIRONMENT_NAME: ${{ inputs.environment }}
+          STATE_RESOURCE_GROUP: ${{ vars.TF_STATE_RESOURCE_GROUP }}
+          STATE_STORAGE_ACCOUNT: ${{ vars.TF_STATE_STORAGE_ACCOUNT }}
         run: |
           terraform -chdir=infrastructure/platform init -input=false \
-            -backend-config="resource_group_name=${{ vars.TF_STATE_RESOURCE_GROUP }}" \
-            -backend-config="storage_account_name=${{ vars.TF_STATE_STORAGE_ACCOUNT }}" \
-            -backend-config="container_name=tfstate-${{ inputs.environment }}" \
-            -backend-config="key=api-platform/${{ inputs.environment }}.tfstate" \
+            -backend-config="resource_group_name=${STATE_RESOURCE_GROUP}" \
+            -backend-config="storage_account_name=${STATE_STORAGE_ACCOUNT}" \
+            -backend-config="container_name=tfstate-${ENVIRONMENT_NAME}" \
+            -backend-config="key=api-platform/${ENVIRONMENT_NAME}.tfstate" \
             -backend-config="use_oidc=true" \
             -backend-config="use_azuread_auth=true"
       - name: Create ${{ inputs.environment }} plan
+        env:
+          ENVIRONMENT_NAME: ${{ inputs.environment }}
+          SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
         run: |
           terraform -chdir=infrastructure/platform plan \
             -input=false \
             -no-color \
-            -var-file="envs/${{ inputs.environment }}.tfvars" \
-            -var="subscription_id=${{ vars.AZURE_SUBSCRIPTION_ID }}" \
-            -out="${{ inputs.environment }}.tfplan" \
-            | tee "${{ runner.temp }}/${{ inputs.environment }}.txt"
+            -var-file="envs/${ENVIRONMENT_NAME}.tfvars" \
+            -var="subscription_id=${SUBSCRIPTION_ID}" \
+            -out="${ENVIRONMENT_NAME}.tfplan" \
+            | tee "${RUNNER_TEMP}/${ENVIRONMENT_NAME}.txt"
       - name: Define immutable plan reference
         id: plan-reference
         shell: bash
+        env:
+          ENVIRONMENT_NAME: ${{ inputs.environment }}
         run: |
-          echo "blob_name=${{ inputs.environment }}/${GITHUB_SHA}/${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.tfplan" >> "$GITHUB_OUTPUT"
-          echo "sha256=$(sha256sum "infrastructure/platform/${{ inputs.environment }}.tfplan" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+          echo "blob_name=${ENVIRONMENT_NAME}/${GITHUB_SHA}/${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.tfplan" >> "$GITHUB_OUTPUT"
+          echo "sha256=$(sha256sum "infrastructure/platform/${ENVIRONMENT_NAME}.tfplan" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
       - name: Upload plan to private Azure Storage
+        env:
+          ENVIRONMENT_NAME: ${{ inputs.environment }}
+          PLAN_BLOB: ${{ steps.plan-reference.outputs.blob_name }}
+          STATE_STORAGE_ACCOUNT: ${{ vars.TF_STATE_STORAGE_ACCOUNT }}
         run: |
           az storage blob upload \
             --auth-mode login \
-            --account-name "${{ vars.TF_STATE_STORAGE_ACCOUNT }}" \
+            --account-name "${STATE_STORAGE_ACCOUNT}" \
             --container-name tfplans \
-            --name "${{ steps.plan-reference.outputs.blob_name }}" \
-            --file "infrastructure/platform/${{ inputs.environment }}.tfplan" \
+            --name "${PLAN_BLOB}" \
+            --file "infrastructure/platform/${ENVIRONMENT_NAME}.tfplan" \
             --overwrite false
       - name: Publish plan summary
+        env:
+          DEPLOY_REASON: ${{ inputs.reason }}
+          ENVIRONMENT_NAME: ${{ inputs.environment }}
+          PLAN_BLOB: ${{ steps.plan-reference.outputs.blob_name }}
+          PLAN_SHA256: ${{ steps.plan-reference.outputs.sha256 }}
         run: |
           {
-            echo "## ${{ inputs.environment }} plan"
-            echo "Reason: ${{ inputs.reason }}"
+            echo "## ${ENVIRONMENT_NAME} plan"
+            printf 'Reason: %s\n' "${DEPLOY_REASON}"
             echo
-            echo "Blob: \`${{ steps.plan-reference.outputs.blob_name }}\`"
-            echo "SHA-256: \`${{ steps.plan-reference.outputs.sha256 }}\`"
+            echo "Blob: \`${PLAN_BLOB}\`"
+            echo "SHA-256: \`${PLAN_SHA256}\`"
             echo
             echo '```text'
-            tail -n 200 "${{ runner.temp }}/${{ inputs.environment }}.txt"
+            tail -n 200 "${RUNNER_TEMP}/${ENVIRONMENT_NAME}.txt"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -107,30 +125,43 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
       - name: Initialize ${{ inputs.environment }} state
+        env:
+          ENVIRONMENT_NAME: ${{ inputs.environment }}
+          STATE_RESOURCE_GROUP: ${{ vars.TF_STATE_RESOURCE_GROUP }}
+          STATE_STORAGE_ACCOUNT: ${{ vars.TF_STATE_STORAGE_ACCOUNT }}
         run: |
           terraform -chdir=infrastructure/platform init -input=false \
-            -backend-config="resource_group_name=${{ vars.TF_STATE_RESOURCE_GROUP }}" \
-            -backend-config="storage_account_name=${{ vars.TF_STATE_STORAGE_ACCOUNT }}" \
-            -backend-config="container_name=tfstate-${{ inputs.environment }}" \
-            -backend-config="key=api-platform/${{ inputs.environment }}.tfstate" \
+            -backend-config="resource_group_name=${STATE_RESOURCE_GROUP}" \
+            -backend-config="storage_account_name=${STATE_STORAGE_ACCOUNT}" \
+            -backend-config="container_name=tfstate-${ENVIRONMENT_NAME}" \
+            -backend-config="key=api-platform/${ENVIRONMENT_NAME}.tfstate" \
             -backend-config="use_oidc=true" \
             -backend-config="use_azuread_auth=true"
       - name: Download the planned change from Azure Storage
+        env:
+          ENVIRONMENT_NAME: ${{ inputs.environment }}
+          PLAN_BLOB: ${{ needs.plan.outputs.plan_blob }}
+          STATE_STORAGE_ACCOUNT: ${{ vars.TF_STATE_STORAGE_ACCOUNT }}
         run: |
           az storage blob download \
             --auth-mode login \
-            --account-name "${{ vars.TF_STATE_STORAGE_ACCOUNT }}" \
+            --account-name "${STATE_STORAGE_ACCOUNT}" \
             --container-name tfplans \
-            --name "${{ needs.plan.outputs.plan_blob }}" \
-            --file "infrastructure/platform/${{ inputs.environment }}.tfplan" \
+            --name "${PLAN_BLOB}" \
+            --file "infrastructure/platform/${ENVIRONMENT_NAME}.tfplan" \
             --overwrite true
       - name: Verify the planned change checksum
         shell: bash
+        env:
+          ENVIRONMENT_NAME: ${{ inputs.environment }}
+          PLAN_SHA256: ${{ needs.plan.outputs.plan_sha256 }}
         run: |
-          echo "${{ needs.plan.outputs.plan_sha256 }}  infrastructure/platform/${{ inputs.environment }}.tfplan" | sha256sum --check --strict
+          echo "${PLAN_SHA256}  infrastructure/platform/${ENVIRONMENT_NAME}.tfplan" | sha256sum --check --strict
       - name: Apply the verified plan without re-planning
+        env:
+          ENVIRONMENT_NAME: ${{ inputs.environment }}
         run: |
           terraform -chdir=infrastructure/platform apply \
             -input=false \
             -auto-approve \
-            "${{ inputs.environment }}.tfplan"
+            "${ENVIRONMENT_NAME}.tfplan"

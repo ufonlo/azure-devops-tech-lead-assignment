@@ -30,44 +30,52 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
       - name: Initialize ${{ inputs.environment }} state
+        env:
+          ENVIRONMENT_NAME: ${{ inputs.environment }}
+          STATE_RESOURCE_GROUP: ${{ vars.TF_STATE_RESOURCE_GROUP }}
+          STATE_STORAGE_ACCOUNT: ${{ vars.TF_STATE_STORAGE_ACCOUNT }}
         run: |
           terraform -chdir=infrastructure/platform init -input=false \
-            -backend-config="resource_group_name=${{ vars.TF_STATE_RESOURCE_GROUP }}" \
-            -backend-config="storage_account_name=${{ vars.TF_STATE_STORAGE_ACCOUNT }}" \
-            -backend-config="container_name=tfstate-${{ inputs.environment }}" \
-            -backend-config="key=api-platform/${{ inputs.environment }}.tfstate" \
+            -backend-config="resource_group_name=${STATE_RESOURCE_GROUP}" \
+            -backend-config="storage_account_name=${STATE_STORAGE_ACCOUNT}" \
+            -backend-config="container_name=tfstate-${ENVIRONMENT_NAME}" \
+            -backend-config="key=api-platform/${ENVIRONMENT_NAME}.tfstate" \
             -backend-config="use_oidc=true" \
             -backend-config="use_azuread_auth=true"
       - name: Create ${{ inputs.environment }} plan
         id: plan
         continue-on-error: true
         shell: bash
+        env:
+          ENVIRONMENT_NAME: ${{ inputs.environment }}
+          SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
         run: |
           set -o pipefail
           terraform -chdir=infrastructure/platform plan \
             -input=false \
             -lock=false \
             -no-color \
-            -var-file="envs/${{ inputs.environment }}.tfvars" \
-            -var="subscription_id=${{ vars.AZURE_SUBSCRIPTION_ID }}" \
-            -out="${{ runner.temp }}/${{ inputs.environment }}.tfplan" \
-            2>&1 | tee "${{ runner.temp }}/${{ inputs.environment }}.txt"
+            -var-file="envs/${ENVIRONMENT_NAME}.tfvars" \
+            -var="subscription_id=${SUBSCRIPTION_ID}" \
+            -out="${RUNNER_TEMP}/${ENVIRONMENT_NAME}.tfplan" \
+            2>&1 | tee "${RUNNER_TEMP}/${ENVIRONMENT_NAME}.txt"
       - name: Prepare sticky comment
         id: comment
         shell: bash
         env:
+          ENVIRONMENT_NAME: ${{ inputs.environment }}
           PLAN_OUTCOME: ${{ steps.plan.outcome }}
         run: |
           {
             echo 'body<<TERRAFORM_PLAN_COMMENT'
-            echo "## Terraform plan: \`${{ inputs.environment }}\`"
+            echo "## Terraform plan: \`${ENVIRONMENT_NAME}\`"
             echo
             echo "Result: **${PLAN_OUTCOME}**"
             echo
             echo '<details><summary>Show plan output</summary>'
             echo
             echo '```text'
-            tail -n 200 "${{ runner.temp }}/${{ inputs.environment }}.txt" 2>/dev/null || echo "Plan output was not produced."
+            tail -n 200 "${RUNNER_TEMP}/${ENVIRONMENT_NAME}.txt" 2>/dev/null || echo "Plan output was not produced."
             echo '```'
             echo '</details>'
             echo 'TERRAFORM_PLAN_COMMENT'
