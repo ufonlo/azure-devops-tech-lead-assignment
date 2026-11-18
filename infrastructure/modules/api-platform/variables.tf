@@ -8,8 +8,8 @@ variable "environment" {
   description = "Deployment environment."
 
   validation {
-    condition     = contains(["dev", "prod"], var.environment)
-    error_message = "environment must be dev or prod."
+    condition     = can(regex("^[a-z][a-z0-9-]{1,10}[a-z0-9]$", var.environment))
+    error_message = "environment must be 3-12 lowercase alphanumeric or hyphen characters, start with a letter, and end with an alphanumeric character."
   }
 }
 
