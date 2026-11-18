@@ -24,6 +24,7 @@ variable "environments" {
   description = "Deployment environments keyed by their stable Terraform resource key."
   type = map(object({
     github_environment = string
+    tfplans_reader     = optional(bool, false)
   }))
   default = {
     dev = {
@@ -31,6 +32,7 @@ variable "environments" {
     }
     prod = {
       github_environment = "production"
+      tfplans_reader     = true
     }
   }
 }

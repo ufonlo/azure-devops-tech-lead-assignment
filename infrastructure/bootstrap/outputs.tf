@@ -15,6 +15,7 @@ output "github_oidc" {
   value = {
     tenant_id       = data.azurerm_subscription.current.tenant_id
     subscription_id = data.azurerm_subscription.current.subscription_id
+    pr_client_id    = azurerm_user_assigned_identity.github["pr"].client_id
     plan_client_id  = azurerm_user_assigned_identity.github["plan"].client_id
     dev_client_id   = azurerm_user_assigned_identity.github["dev"].client_id
     prod_client_id  = azurerm_user_assigned_identity.github["prod"].client_id

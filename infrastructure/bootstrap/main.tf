@@ -93,6 +93,10 @@ resource "azurerm_storage_management_policy" "plans" {
       base_blob {
         delete_after_days_since_modification_greater_than = 7
       }
+
+      version {
+        delete_after_days_since_creation = 7
+      }
     }
   }
 }
@@ -105,10 +109,10 @@ resource "azurerm_management_lock" "state" {
 }
 
 locals {
-  identities = toset(concat(["plan"], keys(var.environments)))
+  identities = toset(concat(["pr", "plan"], keys(var.environments)))
   federations = merge({
-    plan-pr = {
-      identity = "plan"
+    pr = {
+      identity = "pr"
       subject  = "repo:${var.github_repository}:pull_request"
     }
     plan-main = {
@@ -123,8 +127,8 @@ locals {
   })
 
   delegated_role_ids = [
-    data.azurerm_role_definition.acr_pull.role_definition_id,
-    data.azurerm_role_definition.key_vault_secrets_user.role_definition_id,
+    basename(data.azurerm_role_definition.acr_pull.id),
+    basename(data.azurerm_role_definition.key_vault_secrets_user.id),
   ]
 
   constrained_rbac_condition = "((!(ActionMatches{'Microsoft.Authorization/roleAssignments/write'})) OR (@Request[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals {${join(", ", local.delegated_role_ids)}})) AND ((!(ActionMatches{'Microsoft.Authorization/roleAssignments/delete'})) OR (@Resource[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals {${join(", ", local.delegated_role_ids)}}))"
@@ -158,11 +162,17 @@ resource "azurerm_role_assignment" "state_deployer" {
 }
 
 resource "azurerm_role_assignment" "state_plan_reader" {
-  for_each = var.environments
+  for_each = {
+    for pair in setproduct(["pr", "plan"], keys(var.environments)) :
+    "${pair[0]}-${pair[1]}" => {
+      identity    = pair[0]
+      environment = pair[1]
+    }
+  }
 
-  scope                = azurerm_storage_container.state[each.key].id
+  scope                = azurerm_storage_container.state[each.value.environment].id
   role_definition_name = "Storage Blob Data Reader"
-  principal_id         = azurerm_user_assigned_identity.github["plan"].principal_id
+  principal_id         = azurerm_user_assigned_identity.github[each.value.identity].principal_id
 }
 
 resource "azurerm_role_assignment" "plans_writer" {
@@ -171,10 +181,23 @@ resource "azurerm_role_assignment" "plans_writer" {
   principal_id         = azurerm_user_assigned_identity.github["plan"].principal_id
 }
 
-resource "azurerm_role_assignment" "plans_prod_reader" {
+resource "azurerm_role_assignment" "plans_reader" {
+  for_each = {
+    for environment, config in var.environments : environment => config
+    if config.tfplans_reader
+  }
+
   scope                = azurerm_storage_container.plans.id
   role_definition_name = "Storage Blob Data Reader"
-  principal_id         = azurerm_user_assigned_identity.github["prod"].principal_id
+  principal_id         = azurerm_user_assigned_identity.github[each.key].principal_id
+}
+
+resource "azurerm_role_assignment" "pr_reader" {
+  for_each = azurerm_resource_group.environment
+
+  scope                = each.value.id
+  role_definition_name = "Reader"
+  principal_id         = azurerm_user_assigned_identity.github["pr"].principal_id
 }
 
 resource "azurerm_role_assignment" "plan_reader" {
