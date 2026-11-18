@@ -66,7 +66,7 @@ jobs:
           terraform -chdir="infrastructure/environments/${{ matrix.environment }}" init -input=false \
             -backend-config="resource_group_name=${{ vars.TF_STATE_RESOURCE_GROUP }}" \
             -backend-config="storage_account_name=${{ vars.TF_STATE_STORAGE_ACCOUNT }}" \
-            -backend-config="container_name=${{ vars.TF_STATE_CONTAINER }}" \
+            -backend-config="container_name=tfstate-${{ matrix.environment }}" \
             -backend-config="key=api-platform/${{ matrix.environment }}.tfstate" \
             -backend-config="use_oidc=true" \
             -backend-config="use_azuread_auth=true"
@@ -74,6 +74,7 @@ jobs:
         run: |
           terraform -chdir="infrastructure/environments/${{ matrix.environment }}" plan \
             -input=false \
+            -lock=false \
             -no-color \
             -var="subscription_id=${{ vars.AZURE_SUBSCRIPTION_ID }}" \
             -out="${{ runner.temp }}/${{ matrix.environment }}.tfplan" \

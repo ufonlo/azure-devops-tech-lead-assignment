@@ -19,6 +19,8 @@ concurrency:
 jobs:
   plan:
     runs-on: ubuntu-latest
+    outputs:
+      plan_blob: ${{ steps.plan-reference.outputs.blob_name }}
     steps:
       - uses: actions/checkout@v4
       - uses: hashicorp/setup-terraform@v3
@@ -34,13 +36,27 @@ jobs:
           terraform -chdir=infrastructure/environments/prod init -input=false \
             -backend-config="resource_group_name=${{ vars.TF_STATE_RESOURCE_GROUP }}" \
             -backend-config="storage_account_name=${{ vars.TF_STATE_STORAGE_ACCOUNT }}" \
-            -backend-config="container_name=${{ vars.TF_STATE_CONTAINER }}" \
+            -backend-config="container_name=tfstate-prod" \
             -backend-config="key=api-platform/prod.tfstate" \
             -backend-config="use_oidc=true" \
             -backend-config="use_azuread_auth=true"
           terraform -chdir=infrastructure/environments/prod plan -input=false -no-color \
             -var="subscription_id=${{ vars.AZURE_SUBSCRIPTION_ID }}" -out=prod.tfplan \
             | tee "${{ runner.temp }}/prod.txt"
+      - name: Define immutable plan location
+        id: plan-reference
+        shell: bash
+        run: |
+          echo "blob_name=production/${GITHUB_SHA}/${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.tfplan" >> "$GITHUB_OUTPUT"
+      - name: Upload encrypted plan to Azure Storage
+        run: |
+          az storage blob upload \
+            --auth-mode login \
+            --account-name "${{ vars.TF_STATE_STORAGE_ACCOUNT }}" \
+            --container-name tfplans \
+            --name "${{ steps.plan-reference.outputs.blob_name }}" \
+            --file infrastructure/environments/prod/prod.tfplan \
+            --overwrite false
       - name: Publish plan summary
         run: |
           {
@@ -65,16 +81,25 @@ jobs:
           client-id: ${{ vars.AZURE_PROD_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-      - name: Re-plan and apply the reviewed revision
+      - name: Initialize production state
         run: |
           terraform -chdir=infrastructure/environments/prod init -input=false \
             -backend-config="resource_group_name=${{ vars.TF_STATE_RESOURCE_GROUP }}" \
             -backend-config="storage_account_name=${{ vars.TF_STATE_STORAGE_ACCOUNT }}" \
-            -backend-config="container_name=${{ vars.TF_STATE_CONTAINER }}" \
+            -backend-config="container_name=tfstate-prod" \
             -backend-config="key=api-platform/prod.tfstate" \
             -backend-config="use_oidc=true" \
             -backend-config="use_azuread_auth=true"
-          terraform -chdir=infrastructure/environments/prod plan -input=false \
-            -var="subscription_id=${{ vars.AZURE_SUBSCRIPTION_ID }}" -out=prod.tfplan
+      - name: Download the approved plan from Azure Storage
+        run: |
+          az storage blob download \
+            --auth-mode login \
+            --account-name "${{ vars.TF_STATE_STORAGE_ACCOUNT }}" \
+            --container-name tfplans \
+            --name "${{ needs.plan.outputs.plan_blob }}" \
+            --file infrastructure/environments/prod/prod.tfplan \
+            --overwrite true
+      - name: Apply the approved plan
+        run: |
           terraform -chdir=infrastructure/environments/prod apply -input=false -auto-approve prod.tfplan
 

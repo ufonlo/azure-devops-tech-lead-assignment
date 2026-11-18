@@ -34,7 +34,7 @@ jobs:
           terraform -chdir=infrastructure/environments/dev init -input=false \
             -backend-config="resource_group_name=${{ vars.TF_STATE_RESOURCE_GROUP }}" \
             -backend-config="storage_account_name=${{ vars.TF_STATE_STORAGE_ACCOUNT }}" \
-            -backend-config="container_name=${{ vars.TF_STATE_CONTAINER }}" \
+            -backend-config="container_name=tfstate-dev" \
             -backend-config="key=api-platform/dev.tfstate" \
             -backend-config="use_oidc=true" \
             -backend-config="use_azuread_auth=true"
