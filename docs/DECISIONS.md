@@ -36,3 +36,14 @@ without exposing potentially sensitive plan values as GitHub artifacts.
 
 **Reason:** secret values otherwise enter Terraform state. Applications reference externally populated Key Vault secrets through managed identity.
 
+## ADR-006 — Pull-request plans are public metadata
+
+**Decision:** when the repository becomes public, keep human-readable Terraform
+plans in PR comments and Actions logs, but never publish binary plan files.
+
+**Reason:** in-context plans make infrastructure review practical. Terraform masks
+sensitive values, but subscription IDs, principal IDs and resource names can still
+be visible. This metadata exposure is accepted for the assignment; secrets must
+remain in Key Vault and no sensitive values may be passed as ordinary Terraform
+inputs or Container App secrets.
+

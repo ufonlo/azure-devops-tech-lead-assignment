@@ -36,11 +36,20 @@ Bootstrap is intentionally a separate, one-time administrative step. Store its s
 
 Create environments named exactly `development` and `production`:
 
-- `development`: no required reviewer; set environment variable
+- `development`: restrict deployments to the `main` branch, use no required
+  reviewer, and set environment variable
   `AZURE_CLIENT_ID` from `github_oidc.dev_client_id`.
-- `production`: add at least one required reviewer, prevent self-review, restrict
-  deployments to the `main` branch and set environment variable
+- `production`: add the appropriate required reviewer, configure self-review for
+  the team size, restrict deployments to the `main` branch and set environment variable
   `AZURE_CLIENT_ID` from `github_oidc.prod_client_id`.
+
+### Single-maintainer setup used in this repository
+
+The repository owner is the required production reviewer, environment self-review
+is allowed, and the `main` ruleset requires zero PR approvals. This avoids a
+deadlock while retaining an explicit production gate. When a second engineer
+joins, enable one required PR approval, require CODEOWNERS review, disable
+production self-review and make the other engineer a required production reviewer.
 
 Do not create repository-level dev or prod client ID variables. The apply jobs
 read the same `AZURE_CLIENT_ID` name from their selected GitHub Environment.
@@ -64,10 +73,10 @@ artifacts.
 
 These are identifiers, not credentials. No GitHub secret is required for Azure login.
 
-Protect `main`: require pull requests, one approval, resolved conversations,
-CODEOWNERS review and the Terraform checks. Allow GitHub Actions to create PR
-comments; the reusable comment job is the only job granted
-`pull-requests: write`.
+Protect `main`: require pull requests, resolved conversations and the Terraform
+checks. Use the approval settings described above. The reusable comment job is
+the only job granted `pull-requests: write`; do not enable the repository setting
+that allows GitHub Actions to create and approve pull requests.
 
 ## 4. First change
 
@@ -76,6 +85,7 @@ comments; the reusable comment job is the only job granted
 3. Open a PR and inspect both sticky, read-only (`-lock=false`) plan comments
    plus the fmt, validate, TFLint and Trivy checks. Fork PRs run only static
    checks because GitHub does not issue their jobs a trusted Azure OIDC token.
+   Dependabot PRs also skip Azure plans because their workflow token is read-only.
 4. Merge only after the plan is understood.
 5. Confirm main plans and applies development, then plans production.
 6. Approve the `production` environment and verify that the exact plan stored
