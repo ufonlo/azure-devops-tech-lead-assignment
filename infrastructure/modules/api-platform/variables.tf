@@ -59,6 +59,12 @@ variable "key_vault_secret_uris" {
   default     = {}
 }
 
+variable "key_vault_operator_ip_ranges" {
+  type        = list(string)
+  description = "Public IPv4 addresses or CIDR ranges allowed to access the Key Vault data plane for operator tasks."
+  default     = []
+}
+
 variable "secret_environment_variables" {
   type        = map(string)
   description = "Map of environment variable name to a key in key_vault_secret_uris."

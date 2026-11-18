@@ -47,3 +47,20 @@ be visible. This metadata exposure is accepted for the assignment; secrets must
 remain in Key Vault and no sensitive values may be passed as ordinary Terraform
 inputs or Container App secrets.
 
+## ADR-007 — State storage remains reachable through its public endpoint
+
+**Decision:** accept `AZU-0012` for the Terraform state storage account while CI
+runs on GitHub-hosted runners. The runners use dynamic public IP addresses, so a
+default-deny storage firewall would make the backend unreliable. The exception is
+declared inline on the resource rather than in a global Trivy ignore file.
+
+**Compensating controls:** shared-key access is disabled, authentication is Entra
+ID only, anonymous blob access is disabled, TLS 1.2 is required, RBAC is scoped to
+individual containers, and state is protected by versioning, seven-day soft delete
+and a `CanNotDelete` resource lock.
+
+**Production path:** move execution to self-hosted runners inside an Azure VNet and
+use a storage private endpoint, or use GitHub-hosted runners with GitHub's Azure
+private networking, before disabling public network access and changing the
+storage firewall default action to deny.
+

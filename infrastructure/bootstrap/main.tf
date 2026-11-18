@@ -57,6 +57,8 @@ resource "azurerm_role_definition" "terraform_plan_reader" {
   ]
 }
 
+# GitHub-hosted runners use dynamic public IPs; Entra-only access and container-scoped RBAC are the compensating controls.
+#trivy:ignore:AVD-AZU-0012
 resource "azurerm_storage_account" "state" {
   name                            = "st${replace(var.project_name, "-", "")}${random_string.suffix.result}"
   resource_group_name             = azurerm_resource_group.state.name

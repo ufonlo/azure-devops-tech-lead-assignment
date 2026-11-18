@@ -48,6 +48,12 @@ resource "azurerm_key_vault" "this" {
   soft_delete_retention_days    = 7
   public_network_access_enabled = true
   tags                          = local.tags
+
+  network_acls {
+    bypass         = "AzureServices"
+    default_action = "Deny"
+    ip_rules       = var.key_vault_operator_ip_ranges
+  }
 }
 
 resource "azurerm_user_assigned_identity" "runtime" {

@@ -56,6 +56,12 @@ variable "log_retention_days" {
   description = "Log Analytics retention in days."
 }
 
+variable "key_vault_operator_ip_ranges" {
+  type        = list(string)
+  description = "Public IPv4 addresses or CIDR ranges allowed to access the Key Vault data plane for operator tasks."
+  default     = []
+}
+
 variable "tags" {
   type        = map(string)
   description = "Additional Azure resource tags."

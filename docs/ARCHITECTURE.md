@@ -31,6 +31,10 @@ The workload is described as one containerized API and the team is small. Contai
   values. The Terraform plan identities can call `listSecrets` because the
   AzureRM provider requires it during refresh, so values stored directly on a
   Container App would be exposed to pull-request plans.
+- Key Vault denies unmatched public data-plane traffic. Temporary operator access
+  can be supplied as explicit IPv4/CIDR ranges. Before the application consumes
+  Key Vault references, integrate the Container Apps environment with a VNet and
+  add either a Key Vault private endpoint or an appropriate subnet network rule.
 - Production uses a dedicated GitHub environment with required reviewers.
 - State storage disables public blob access, uses Azure RBAC, blob versioning,
   seven-day soft delete, and a `CanNotDelete` account lock.
