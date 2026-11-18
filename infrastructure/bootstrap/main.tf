@@ -39,15 +39,23 @@ resource "azurerm_storage_container" "state" {
 }
 
 locals {
-  identities = {
-    plan = {
-      subject = "repo:${var.github_repository}:pull_request"
+  identities = toset(["plan", "dev", "prod"])
+  federations = {
+    plan-pr = {
+      identity = "plan"
+      subject  = "repo:${var.github_repository}:pull_request"
+    }
+    plan-main = {
+      identity = "plan"
+      subject  = "repo:${var.github_repository}:ref:refs/heads/main"
     }
     dev = {
-      subject = "repo:${var.github_repository}:environment:development"
+      identity = "dev"
+      subject  = "repo:${var.github_repository}:environment:development"
     }
     prod = {
-      subject = "repo:${var.github_repository}:environment:production"
+      identity = "prod"
+      subject  = "repo:${var.github_repository}:environment:production"
     }
   }
 }
@@ -62,11 +70,11 @@ resource "azurerm_user_assigned_identity" "github" {
 }
 
 resource "azurerm_federated_identity_credential" "github" {
-  for_each = local.identities
+  for_each = local.federations
 
   name                = "github-${each.key}"
   resource_group_name = azurerm_resource_group.state.name
-  parent_id           = azurerm_user_assigned_identity.github[each.key].id
+  parent_id           = azurerm_user_assigned_identity.github[each.value.identity].id
   audience            = ["api://AzureADTokenExchange"]
   issuer              = "https://token.actions.githubusercontent.com"
   subject             = each.value.subject

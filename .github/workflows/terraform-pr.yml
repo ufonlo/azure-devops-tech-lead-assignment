@@ -1,0 +1,90 @@
+name: Terraform pull request
+
+on:
+  pull_request:
+    paths:
+      - "infrastructure/**"
+      - ".github/workflows/terraform-*.yml"
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: terraform-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  static-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+      - name: Check formatting
+        run: terraform fmt -check -recursive infrastructure
+      - name: Validate bootstrap
+        run: |
+          terraform -chdir=infrastructure/bootstrap init -backend=false -input=false
+          terraform -chdir=infrastructure/bootstrap validate
+      - name: Validate environments
+        shell: bash
+        run: |
+          for environment in dev prod; do
+            terraform -chdir="infrastructure/environments/${environment}" init -backend=false -input=false
+            terraform -chdir="infrastructure/environments/${environment}" validate
+          done
+      - name: Scan Terraform configuration
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: config
+          scan-ref: infrastructure
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+
+  plan:
+    needs: static-checks
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: [dev, prod]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+      - name: Sign in to Azure through GitHub OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_PLAN_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Initialize remote state
+        run: |
+          terraform -chdir="infrastructure/environments/${{ matrix.environment }}" init -input=false \
+            -backend-config="resource_group_name=${{ vars.TF_STATE_RESOURCE_GROUP }}" \
+            -backend-config="storage_account_name=${{ vars.TF_STATE_STORAGE_ACCOUNT }}" \
+            -backend-config="container_name=${{ vars.TF_STATE_CONTAINER }}" \
+            -backend-config="key=api-platform/${{ matrix.environment }}.tfstate" \
+            -backend-config="use_oidc=true" \
+            -backend-config="use_azuread_auth=true"
+      - name: Create plan
+        run: |
+          terraform -chdir="infrastructure/environments/${{ matrix.environment }}" plan \
+            -input=false \
+            -no-color \
+            -var="subscription_id=${{ vars.AZURE_SUBSCRIPTION_ID }}" \
+            -out="${{ runner.temp }}/${{ matrix.environment }}.tfplan" \
+            | tee "${{ runner.temp }}/${{ matrix.environment }}.txt"
+      - name: Publish plan summary
+        if: always()
+        run: |
+          {
+            echo "## Terraform plan: ${{ matrix.environment }}"
+            echo '```text'
+            tail -n 200 "${{ runner.temp }}/${{ matrix.environment }}.txt" 2>/dev/null || echo "Plan was not produced."
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+

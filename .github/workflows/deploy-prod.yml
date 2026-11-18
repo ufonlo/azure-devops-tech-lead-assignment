@@ -1,0 +1,80 @@
+name: Deploy production
+
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: Change or release being promoted
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_PLAN_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Plan production
+        run: |
+          terraform -chdir=infrastructure/environments/prod init -input=false \
+            -backend-config="resource_group_name=${{ vars.TF_STATE_RESOURCE_GROUP }}" \
+            -backend-config="storage_account_name=${{ vars.TF_STATE_STORAGE_ACCOUNT }}" \
+            -backend-config="container_name=${{ vars.TF_STATE_CONTAINER }}" \
+            -backend-config="key=api-platform/prod.tfstate" \
+            -backend-config="use_oidc=true" \
+            -backend-config="use_azuread_auth=true"
+          terraform -chdir=infrastructure/environments/prod plan -input=false -no-color \
+            -var="subscription_id=${{ vars.AZURE_SUBSCRIPTION_ID }}" -out=prod.tfplan \
+            | tee "${{ runner.temp }}/prod.txt"
+      - name: Publish plan summary
+        run: |
+          {
+            echo "## Production plan"
+            echo "Reason: ${{ inputs.reason }}"
+            echo '```text'
+            tail -n 200 "${{ runner.temp }}/prod.txt"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  apply:
+    needs: plan
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_PROD_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Re-plan and apply the reviewed revision
+        run: |
+          terraform -chdir=infrastructure/environments/prod init -input=false \
+            -backend-config="resource_group_name=${{ vars.TF_STATE_RESOURCE_GROUP }}" \
+            -backend-config="storage_account_name=${{ vars.TF_STATE_STORAGE_ACCOUNT }}" \
+            -backend-config="container_name=${{ vars.TF_STATE_CONTAINER }}" \
+            -backend-config="key=api-platform/prod.tfstate" \
+            -backend-config="use_oidc=true" \
+            -backend-config="use_azuread_auth=true"
+          terraform -chdir=infrastructure/environments/prod plan -input=false \
+            -var="subscription_id=${{ vars.AZURE_SUBSCRIPTION_ID }}" -out=prod.tfplan
+          terraform -chdir=infrastructure/environments/prod apply -input=false -auto-approve prod.tfplan
+
