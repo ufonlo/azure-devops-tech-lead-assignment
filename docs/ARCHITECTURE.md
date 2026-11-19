@@ -25,6 +25,11 @@ The workload is described as one containerized API and the team is small. Contai
 
 - GitHub authenticates with immutable, numeric-owner/repository OIDC subjects
   scoped to the pull request, `main` branch or GitHub environment.
+- Terraform jobs set `ARM_CLIENT_ID`, `ARM_TENANT_ID`, `ARM_SUBSCRIPTION_ID` and
+  `ARM_USE_OIDC=true`, so both the AzureRM backend and provider request fresh
+  GitHub OIDC tokens directly. `azure/login` remains available for Azure CLI
+  operations such as saved-plan upload and download; Terraform does not reuse
+  its short-lived federated assertion.
 - Runtime uses a user-assigned managed identity.
 - `AcrPull` and `Key Vault Secrets User` are granted to runtime; no registry password is exposed.
 - Terraform receives secret identifiers, not secret values.
