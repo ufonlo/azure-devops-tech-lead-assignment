@@ -2,16 +2,50 @@ name: Terraform pull request
 
 on:
   pull_request:
-    paths:
-      - "infrastructure/**"
-      - ".github/workflows/**"
 
 concurrency:
   group: terraform-pr-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      terraform: ${{ steps.changed-files.outputs.terraform }}
+    steps:
+      - name: Detect Terraform and workflow changes
+        id: changed-files
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+
+          changed_files="$(
+            gh api --paginate \
+              "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files" \
+              --jq '.[] | .filename, (.previous_filename // empty)'
+          )"
+
+          terraform=false
+          while IFS= read -r changed_file; do
+            case "$changed_file" in
+              infrastructure/*|.github/workflows/*)
+                terraform=true
+                break
+                ;;
+            esac
+          done <<< "$changed_files"
+
+          echo "terraform=$terraform" >> "$GITHUB_OUTPUT"
+          echo "Terraform or workflow files changed: $terraform"
+
   static-checks:
+    needs: changes
+    if: needs.changes.outputs.terraform == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -49,8 +83,8 @@ jobs:
           exit-code: "1"
 
   plan-dev:
-    needs: static-checks
-    if: github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]'
+    needs: [changes, static-checks]
+    if: needs.changes.outputs.terraform == 'true' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]'
     uses: ./.github/workflows/reusable-pr-plan.yml
     with:
       environment: dev
@@ -60,8 +94,8 @@ jobs:
       pull-requests: write
 
   plan-prod:
-    needs: static-checks
-    if: github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]'
+    needs: [changes, static-checks]
+    if: needs.changes.outputs.terraform == 'true' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]'
     uses: ./.github/workflows/reusable-pr-plan.yml
     with:
       environment: prod
@@ -69,3 +103,82 @@ jobs:
       contents: read
       id-token: write
       pull-requests: write
+
+  required-checks:
+    name: required-checks
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [changes, static-checks, plan-dev, plan-prod]
+    permissions: {}
+    env:
+      CHANGES_RESULT: ${{ needs.changes.result }}
+      TERRAFORM_CHANGED: ${{ needs.changes.outputs.terraform }}
+      STATIC_CHECKS_RESULT: ${{ needs.static-checks.result }}
+      PLAN_DEV_RESULT: ${{ needs.plan-dev.result }}
+      PLAN_PROD_RESULT: ${{ needs.plan-prod.result }}
+      SAME_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+      IS_DEPENDABOT: ${{ github.actor == 'dependabot[bot]' }}
+    steps:
+      - name: Evaluate required checks
+        run: |
+          set -euo pipefail
+
+          gate_failed=false
+
+          echo "changes: ${CHANGES_RESULT}; Terraform/workflow changes=${TERRAFORM_CHANGED:-unknown}."
+          if [[ "$CHANGES_RESULT" != "success" ]]; then
+            echo "ERROR: changed-file detection did not succeed; failing closed."
+            gate_failed=true
+          fi
+
+          if [[ "$TERRAFORM_CHANGED" != "true" && "$TERRAFORM_CHANGED" != "false" ]]; then
+            echo "ERROR: changed-file detection did not produce a true/false output."
+            gate_failed=true
+          fi
+
+          echo "static-checks: ${STATIC_CHECKS_RESULT}; required only for Terraform or workflow changes."
+          echo "plan-dev: ${PLAN_DEV_RESULT}; requires a trusted same-repository, non-Dependabot pull request."
+          echo "plan-prod: ${PLAN_PROD_RESULT}; requires a trusted same-repository, non-Dependabot pull request."
+
+          for result in "$STATIC_CHECKS_RESULT" "$PLAN_DEV_RESULT" "$PLAN_PROD_RESULT"; do
+            if [[ "$result" == "failure" || "$result" == "cancelled" ]]; then
+              echo "ERROR: a CI job failed or was cancelled."
+              gate_failed=true
+            fi
+          done
+
+          if [[ "$CHANGES_RESULT" == "success" && "$TERRAFORM_CHANGED" == "false" ]]; then
+            echo "decision: pass; no Terraform or workflow files changed, so validation and plans are expected to be skipped."
+          elif [[ "$CHANGES_RESULT" == "success" && "$TERRAFORM_CHANGED" == "true" ]]; then
+            if [[ "$STATIC_CHECKS_RESULT" != "success" ]]; then
+              echo "ERROR: Terraform or workflow files changed, but static-checks did not succeed."
+              gate_failed=true
+            fi
+
+            if [[ "$SAME_REPOSITORY" != "true" ]]; then
+              echo "ERROR: Azure plans cannot run for a fork pull request. A maintainer must push the change to a branch in this repository so the Azure plans can run."
+              gate_failed=true
+            elif [[ "$IS_DEPENDABOT" == "true" ]]; then
+              for result in "$PLAN_DEV_RESULT" "$PLAN_PROD_RESULT"; do
+                if [[ "$result" != "success" && "$result" != "skipped" ]]; then
+                  echo "ERROR: Dependabot plans must either succeed or be skipped."
+                  gate_failed=true
+                fi
+              done
+              echo "decision: Azure plans are intentionally not run for Dependabot pull requests."
+            else
+              if [[ "$PLAN_DEV_RESULT" != "success" || "$PLAN_PROD_RESULT" != "success" ]]; then
+                echo "ERROR: both Azure plans must succeed for a same-repository pull request."
+                gate_failed=true
+              else
+                echo "decision: static checks and both Azure plans succeeded."
+              fi
+            fi
+          fi
+
+          if [[ "$gate_failed" == "true" ]]; then
+            echo "required-checks: fail"
+            exit 1
+          fi
+
+          echo "required-checks: pass"

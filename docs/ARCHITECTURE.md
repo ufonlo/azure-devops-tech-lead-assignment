@@ -66,6 +66,11 @@ are updated in one sticky PR comment per environment. Main-branch plans are
 uploaded directly to Azure Storage instead of becoming GitHub artifacts. Each
 apply job downloads its environment plan, verifies the published SHA-256 and
 applies it without recalculating; production first waits for environment approval.
+The `required-checks` job is the sole required PR status: it passes docs-only
+changes without running Terraform, requires static checks and both plans for
+trusted infrastructure changes, and explicitly handles the restricted Dependabot
+token while rejecting infrastructure changes from forks that cannot obtain Azure
+OIDC credentials.
 
 The `CanNotDelete` lock applies to ARM control-plane operations at the storage
 account scope. With AzureRM 4.x containers use `storage_account_id`, so deleting

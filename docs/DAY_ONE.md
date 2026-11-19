@@ -123,19 +123,31 @@ artifacts.
 
 These are identifiers, not credentials. No GitHub secret is required for Azure login.
 
-Protect `main`: require pull requests, resolved conversations and the Terraform
-checks. Use the approval settings described above. The reusable comment job is
-the only job granted `pull-requests: write`; do not enable the repository setting
-that allows GitHub Actions to create and approve pull requests.
+Protect `main`: require pull requests, resolved conversations and exactly one
+status check named `required-checks` with source **GitHub Actions**. Require
+branches to be up to date before merging. A single gate ensures every pull
+request receives a stable required check even when path-based work is skipped or
+a reusable workflow caller is intentionally skipped. Use the approval settings
+described above. The reusable comment job is the only job granted
+`pull-requests: write`; do not enable the repository setting that allows GitHub
+Actions to create and approve pull requests.
 
 ## 4. First change
 
 1. Create a feature branch.
 2. Change one low-risk tag or module input.
 3. Open a PR and inspect both sticky, read-only (`-lock=false`) plan comments
-   plus the fmt, validate, TFLint and Trivy checks. Fork PRs run only static
-   checks because GitHub does not issue their jobs a trusted Azure OIDC token.
-   Dependabot PRs also skip Azure plans because their workflow token is read-only.
+   plus the fmt, validate, TFLint and Trivy checks. Fork PRs run static checks but
+   cannot pass the gate when Terraform or workflows change because GitHub does
+   not issue their jobs a trusted Azure OIDC token; a maintainer must reproduce
+   such a change on a branch in this repository.
+   Dependabot PRs skip Azure plans because their runs receive a read-only
+   `GITHUB_TOKEN`, so the sticky plan comment cannot be posted, and this project
+   deliberately does not give bot-authored dependency updates Azure credentials:
+   a compromised dependency or action could use them. `required-checks` accepts
+   that exception. The updated actions are first exercised by the main run on
+   development before the approval-gated production run. A maintainer who wants
+   plans on the PR can push a commit to the Dependabot branch.
 4. Merge only after the plan is understood.
 5. Confirm main plans and applies development, then plans production.
 6. Approve the `production` environment and verify that the exact plan stored

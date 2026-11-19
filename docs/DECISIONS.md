@@ -129,3 +129,25 @@ the separate production subscription required by the target landing-zone layout,
 or obtain a suitable quota increase. Then set `container_apps_enabled = true` in
 `prod.tfvars`; no module redesign is required.
 
+## ADR-011 — Single required CI gate
+
+**Decision:** require exactly one GitHub Actions status, `required-checks`, in the
+main-branch ruleset. The workflow runs on every pull request, detects whether
+Terraform or workflow files changed, and uses the results of static validation
+and environment plans to make one explicit pass-or-fail decision.
+
+**Reason:** path filters prevented docs-only pull requests from receiving the
+individually required `static-checks`, `plan-dev / plan` and `plan-prod / plan`
+statuses. Skipping reusable-workflow callers has the same effect: Dependabot PR
+#2 could not create its nested plan statuses and remained permanently blocked.
+A final job that always exists avoids required checks being left pending while
+still preserving conditional execution of expensive or privileged jobs.
+
+**Trade-off:** Dependabot action-only updates can merge without an Azure plan on
+the pull request. Dependabot runs receive a read-only `GITHUB_TOKEN`, so the
+sticky plan comment cannot be posted, and the project deliberately does not give
+bot-authored dependency updates Azure credentials because a compromised
+dependency or action could use them. The risk is mitigated by full-SHA action
+pins, static validation, the development-first deployment on `main`, and the
+approval-gated production run.
+
