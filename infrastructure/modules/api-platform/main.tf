@@ -11,7 +11,8 @@ resource "random_string" "global_name_suffix" {
 }
 
 locals {
-  prefix = "${var.project_name}-${var.environment}"
+  prefix                  = "${var.project_name}-${var.environment}"
+  container_apps_location = coalesce(var.container_apps_location, var.location)
   tags = merge(var.tags, {
     environment = var.environment
     managed-by  = "terraform"
@@ -77,10 +78,17 @@ resource "azurerm_role_assignment" "key_vault_reader" {
 
 resource "azurerm_container_app_environment" "this" {
   name                       = "cae-${local.prefix}"
-  location                   = var.location
+  location                   = local.container_apps_location
   resource_group_name        = data.azurerm_resource_group.this.name
   log_analytics_workspace_id = azurerm_log_analytics_workspace.this.id
   tags                       = local.tags
+
+  workload_profile {
+    name                  = "Consumption"
+    workload_profile_type = "Consumption"
+    minimum_count         = 0
+    maximum_count         = 0
+  }
 }
 
 resource "azurerm_monitor_diagnostic_setting" "key_vault" {
@@ -120,6 +128,7 @@ resource "azurerm_container_app" "api" {
   container_app_environment_id = azurerm_container_app_environment.this.id
   resource_group_name          = data.azurerm_resource_group.this.name
   revision_mode                = "Single"
+  workload_profile_name        = "Consumption"
   tags                         = local.tags
 
   identity {

@@ -23,6 +23,12 @@ variable "location" {
   description = "Azure region."
 }
 
+variable "container_apps_location" {
+  type        = string
+  description = "Optional Azure region used only for the Container Apps managed environment. Defaults to location."
+  default     = null
+}
+
 variable "container_image" {
   type        = string
   description = "Full container image reference. Use an immutable digest in production."
