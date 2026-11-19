@@ -65,6 +65,8 @@ AI_USAGE.md              transparent AI usage log
 - TFLint and Trivy add provider-aware linting and infrastructure security checks before a plan can pass the gate.
 - One `required-checks` gate prevents docs-only and intentionally skipped jobs from leaving pull requests permanently pending.
 
+This went well beyond the suggested 3–4 hours. The extra time went into the optional real deployment and fixing what it exposed.
+
 ## Local validation
 
 ```bash

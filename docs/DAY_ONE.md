@@ -52,6 +52,8 @@ terraform -chdir=infrastructure/bootstrap output
 
 Bootstrap is intentionally a separate, one-time administrative step. Store its state securely; after GitHub OIDC is active, normal delivery has no long-lived credentials.
 
+In this reference deployment, bootstrap state is a local file on the maintainer's workstation and is ignored by Git. For a client engagement, migrate it after the first apply to a separate, locked storage account owned by the platform team. The state contains identity and resource metadata and is the only record of the bootstrap resources.
+
 ### Seed each remote state once
 
 An empty backend container has no state blob. Terraform 1.9 creates and leases an
