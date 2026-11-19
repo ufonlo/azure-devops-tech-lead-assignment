@@ -1,6 +1,6 @@
 output "api_url" {
-  value       = "https://${azurerm_container_app.api.ingress[0].fqdn}"
-  description = "Public API URL."
+  value       = var.container_apps_enabled ? "https://${azurerm_container_app.api[0].ingress[0].fqdn}" : null
+  description = "Public API URL, or null when Container Apps is disabled."
 }
 
 output "container_registry" {

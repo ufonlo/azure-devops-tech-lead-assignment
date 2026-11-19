@@ -25,10 +25,10 @@ variable "location" {
   default     = "northeurope"
 }
 
-variable "container_apps_location" {
-  type        = string
-  description = "Optional Azure region used only for the Container Apps managed environment. Defaults to location."
-  default     = null
+variable "container_apps_enabled" {
+  type        = bool
+  description = "Create the Container Apps managed environment and API application."
+  default     = true
 }
 
 variable "container_image" {

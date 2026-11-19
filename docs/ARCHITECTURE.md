@@ -15,7 +15,7 @@ flowchart LR
   AZ --> LAW
 ```
 
-Development and production use the same Terraform module but separate resource groups, state keys, identities, configuration and GitHub environments. This limits blast radius and makes promotion explicit.
+Development and production use the same Terraform module but separate resource groups, state keys, identities, configuration and GitHub environments. This limits blast radius and makes promotion explicit. On the current Free Trial subscription, only development runs the API: production retains its supporting resources and complete delivery path but disables the Container Apps runtime because the subscription allows only one managed environment globally.
 
 ## Why Container Apps instead of AKS
 
@@ -78,9 +78,12 @@ RBAC, versioning, soft delete, and lifecycle policy.
 
 ## Reliability and cost
 
-- Dev may scale to zero; production keeps one minimum replica.
+- Dev may scale to zero and is the only traffic-serving environment on the current
+  Free Trial. Production creates no Container Apps resources until it moves to a
+  subscription without the global trial limit.
 - Log retention is shorter in dev than prod.
-- ACR Basic and consumption-based Container Apps avoid fixed cluster cost.
+- ACR Basic and development's consumption-based Container Apps avoid fixed cluster
+  cost.
 - Revision-based rollout supports quick rollback.
 - For a larger platform, add Front Door/WAF, private endpoints, zone-aware capacity, alert rules and a tested disaster-recovery plan.
 

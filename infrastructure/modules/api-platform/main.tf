@@ -11,8 +11,7 @@ resource "random_string" "global_name_suffix" {
 }
 
 locals {
-  prefix                  = "${var.project_name}-${var.environment}"
-  container_apps_location = coalesce(var.container_apps_location, var.location)
+  prefix = "${var.project_name}-${var.environment}"
   tags = merge(var.tags, {
     environment = var.environment
     managed-by  = "terraform"
@@ -77,8 +76,10 @@ resource "azurerm_role_assignment" "key_vault_reader" {
 }
 
 resource "azurerm_container_app_environment" "this" {
+  count = var.container_apps_enabled ? 1 : 0
+
   name                       = "cae-${local.prefix}"
-  location                   = local.container_apps_location
+  location                   = var.location
   resource_group_name        = data.azurerm_resource_group.this.name
   log_analytics_workspace_id = azurerm_log_analytics_workspace.this.id
   tags                       = local.tags
@@ -124,8 +125,10 @@ resource "azurerm_monitor_diagnostic_setting" "container_registry" {
 }
 
 resource "azurerm_container_app" "api" {
+  count = var.container_apps_enabled ? 1 : 0
+
   name                         = "ca-${local.prefix}-api"
-  container_app_environment_id = azurerm_container_app_environment.this.id
+  container_app_environment_id = azurerm_container_app_environment.this[0].id
   resource_group_name          = data.azurerm_resource_group.this.name
   revision_mode                = "Single"
   workload_profile_name        = "Consumption"
@@ -197,5 +200,15 @@ resource "azurerm_container_app" "api" {
     azurerm_role_assignment.acr_pull,
     azurerm_role_assignment.key_vault_reader
   ]
+}
+
+moved {
+  from = azurerm_container_app_environment.this
+  to   = azurerm_container_app_environment.this[0]
+}
+
+moved {
+  from = azurerm_container_app.api
+  to   = azurerm_container_app.api[0]
 }
 
