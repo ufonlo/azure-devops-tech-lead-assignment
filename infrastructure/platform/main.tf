@@ -5,7 +5,7 @@ module "api_platform" {
   environment                  = var.environment
   resource_group_name          = "rg-${var.project_name}-${var.environment}"
   location                     = var.location
-  container_apps_location      = var.container_apps_location
+  container_apps_enabled       = var.container_apps_enabled
   container_image              = var.container_image
   min_replicas                 = var.min_replicas
   max_replicas                 = var.max_replicas

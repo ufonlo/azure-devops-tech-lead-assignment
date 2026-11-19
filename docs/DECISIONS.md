@@ -98,26 +98,34 @@ a stale lease or restore a protected blob version. Every use should be deliberat
 audited and removed when no longer required. In production this would be assigned
 to a PIM-eligible Entra group rather than retained as a standing user role.
 
-## ADR-010 — Run the production Container Apps environment in West Europe
+## ADR-010 — Disable the production Container Apps runtime on the trial subscription
 
-**Decision:** while this project uses the Free Trial subscription, place only the
-production Container Apps managed environment in West Europe. Keep the production
-resource group, managed identity, ACR, purge-protected Key Vault and Log Analytics
-workspace in North Europe. The Container App follows its managed environment.
+**Decision:** set `container_apps_enabled = false` for production while this
+project uses the Free Trial subscription. Production retains its resource group,
+runtime identity, ACR, purge-protected Key Vault, Log Analytics workspace, role
+assignments and diagnostics, but it has no Container Apps managed environment or
+Container App and therefore serves no traffic. Development is the running
+environment.
 
-**Reason:** the subscription permits one Container Apps managed environment per
-region, and development already consumes the North Europe quota. The first
-production deployment consequently failed with
-`MaxNumberOfRegionalEnvironmentsInSubExceeded`. Moving all production resources
-would create unnecessary replacements and cannot safely replace the purge-protected
-vault.
+**What was tried:** after North Europe returned
+`MaxNumberOfRegionalEnvironmentsInSubExceeded`, an environment-only region override
+placed the proposed production Container Apps environment in West Europe while
+leaving every other production resource in North Europe.
 
-**Trade-offs:** images are pulled across regions from ACR, telemetry is ingested
-across regions into Log Analytics, calls to North Europe dependencies gain a small
-amount of latency, and cross-region data transfer may add a small charge.
+**Why it failed:** ARM preflight validation in five regions confirmed that this
+Free Trial permits only one managed environment globally, not one per region, and
+development already consumes it. Requests therefore fail with
+`MaxNumberOfGlobalEnvironmentsInSubExceeded`. West Europe additionally rejects new
+Container Apps customers, so the regional override cannot provide a viable runtime.
 
-**Production path:** use separate Azure subscriptions for development and
-production, or request a managed-environment quota increase. After either change,
-remove `container_apps_location` from `prod.tfvars` so Container Apps uses the
-normal environment location again.
+**Delivery consequence:** the main pipeline still plans and applies development,
+creates and uploads the exact production plan, verifies its SHA-256, waits for the
+protected `production` environment approval and applies that approved plan. This
+keeps the complete production delivery and governance path exercised even though
+the production API is intentionally absent.
+
+**Path back:** move production to a subscription without the trial limit, ideally
+the separate production subscription required by the target landing-zone layout,
+or obtain a suitable quota increase. Then set `container_apps_enabled = true` in
+`prod.tfvars`; no module redesign is required.
 
