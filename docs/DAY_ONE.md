@@ -23,7 +23,16 @@ az account show --subscription <PERSONAL_SUBSCRIPTION_ID> \
 
 Copy `infrastructure/bootstrap/terraform.tfvars.example` to `terraform.tfvars`,
 then replace the subscription ID, `OWNER/REPOSITORY`, immutable owner ID and
-immutable repository ID. Read both public GitHub IDs with either:
+immutable repository ID. Add the signed-in operator object ID to
+`state_operator_object_ids`; this grants break-glass access only to the
+environment state containers, not to `tfplans`:
+
+```bash
+AZURE_CONFIG_DIR="$HOME/.azure-personal" az ad signed-in-user show \
+  --query id -o tsv
+```
+
+Read both public GitHub IDs with either:
 
 ```bash
 gh api repos/OWNER/REPOSITORY --jq '.owner.id, .id'
@@ -42,6 +51,36 @@ terraform -chdir=infrastructure/bootstrap output
 ```
 
 Bootstrap is intentionally a separate, one-time administrative step. Store its state securely; after GitHub OIDC is active, normal delivery has no long-lived credentials.
+
+### Seed each remote state once
+
+An empty backend container has no state blob. Terraform 1.9 creates and leases an
+empty state during the first `init`, which deliberately cannot be done by the
+read-only PR and main-plan identities. After applying bootstrap, use the signed-in
+state operator once to seed every environment. Obtain the backend names from
+`terraform -chdir=infrastructure/bootstrap output`, then run:
+
+```bash
+export AZURE_CONFIG_DIR="$HOME/.azure-personal"
+az login --tenant <PERSONAL_TENANT_ID>
+
+export TF_STATE_RESOURCE_GROUP="<backend.resource_group_name>"
+export TF_STATE_STORAGE_ACCOUNT="<backend.storage_account_name>"
+
+for environment in dev prod; do
+  terraform -chdir=infrastructure/platform init \
+    -reconfigure \
+    -input=false \
+    -backend-config="resource_group_name=${TF_STATE_RESOURCE_GROUP}" \
+    -backend-config="storage_account_name=${TF_STATE_STORAGE_ACCOUNT}" \
+    -backend-config="container_name=tfstate-${environment}" \
+    -backend-config="key=api-platform/${environment}.tfstate" \
+    -backend-config="use_azuread_auth=true"
+done
+```
+
+This is a one-time operation for each newly created environment. Do not run an
+apply while seeding state.
 
 ## 3. Configure GitHub
 

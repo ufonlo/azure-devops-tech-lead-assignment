@@ -183,6 +183,20 @@ resource "azurerm_role_assignment" "state_deployer" {
   principal_id         = azurerm_user_assigned_identity.github[each.key].principal_id
 }
 
+resource "azurerm_role_assignment" "state_operator" {
+  for_each = {
+    for pair in setproduct(var.state_operator_object_ids, keys(var.environments)) :
+    "${pair[0]}-${pair[1]}" => {
+      object_id   = pair[0]
+      environment = pair[1]
+    }
+  }
+
+  scope                = azurerm_storage_container.state[each.value.environment].id
+  role_definition_name = "Storage Blob Data Contributor"
+  principal_id         = each.value.object_id
+}
+
 resource "azurerm_role_assignment" "state_plan_reader" {
   for_each = {
     for pair in setproduct(["pr", "plan"], keys(var.environments)) :

@@ -18,6 +18,11 @@ variable "project_name" {
 variable "github_repository" {
   description = "GitHub repository in owner/name form."
   type        = string
+
+  validation {
+    condition     = can(regex("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$", var.github_repository))
+    error_message = "github_repository must use the owner/name form."
+  }
 }
 
 variable "github_owner_id" {
@@ -37,6 +42,20 @@ variable "github_repository_id" {
   validation {
     condition     = can(regex("^[0-9]+$", var.github_repository_id))
     error_message = "github_repository_id must contain digits only."
+  }
+}
+
+variable "state_operator_object_ids" {
+  description = "Entra object IDs granted break-glass contributor access to environment state containers."
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition = alltrue([
+      for object_id in var.state_operator_object_ids :
+      can(regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", object_id))
+    ])
+    error_message = "Every state operator object ID must be a UUID."
   }
 }
 

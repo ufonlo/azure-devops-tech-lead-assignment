@@ -57,8 +57,10 @@ jobs:
           ENVIRONMENT_NAME: ${{ inputs.environment }}
           SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
         run: |
+          # Main deployments are serialized; apply locks state and stale saved plans are rejected.
           terraform -chdir=infrastructure/platform plan \
             -input=false \
+            -lock=false \
             -no-color \
             -var-file="envs/${ENVIRONMENT_NAME}.tfvars" \
             -var="subscription_id=${SUBSCRIPTION_ID}" \

@@ -80,3 +80,21 @@ subjects by default, so name-based Azure subjects do not match its tokens.
 read through `gh api` or GitHub's unauthenticated public repository REST endpoint
 and are safe to store in the non-secret Terraform configuration.
 
+## ADR-009 — State seeding and operator break-glass access
+
+**Decision:** PR and main-plan identities remain read-only on environment state.
+After bootstrap creates a new state container, an explicitly configured state
+operator runs `terraform init` once to create its first state blob. Operators have
+`Storage Blob Data Contributor` only on `tfstate-<environment>` containers and no
+access through this assignment to the `tfplans` container.
+
+**Reason:** Terraform 1.9 initializes an absent AzureRM state blob by taking a
+lease and writing empty state. Granting plan identities write access merely to
+support that one-time operation would weaken the separation between planning and
+deployment.
+
+**Break-glass use:** the same narrowly scoped role permits an operator to recover
+a stale lease or restore a protected blob version. Every use should be deliberate,
+audited and removed when no longer required. In production this would be assigned
+to a PIM-eligible Entra group rather than retained as a standing user role.
+
