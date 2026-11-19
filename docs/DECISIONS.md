@@ -21,6 +21,12 @@ while keeping separate tfvars, state containers, identities and GitHub environme
 
 **Reason:** consistency without coupling lifecycle or permissions.
 
+## ADR-004 — Secrets by reference
+
+**Decision:** Terraform creates the vault and access model but does not create application secret values.
+
+**Reason:** secret values otherwise enter Terraform state. Applications reference externally populated Key Vault secrets through managed identity.
+
 ## ADR-005 — Approved plans stay in Azure Storage
 
 **Decision:** upload main-branch saved plans to a private `tfplans` container,
@@ -29,12 +35,6 @@ read but not write them.
 
 **Reason:** apply verifies the plan checksum and uses exactly the planned file
 without exposing potentially sensitive plan values as GitHub artifacts.
-
-## ADR-004 — Secrets by reference
-
-**Decision:** Terraform creates the vault and access model but does not create application secret values.
-
-**Reason:** secret values otherwise enter Terraform state. Applications reference externally populated Key Vault secrets through managed identity.
 
 ## ADR-006 — Pull-request plans are public metadata
 
