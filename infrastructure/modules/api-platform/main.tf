@@ -4,6 +4,12 @@ data "azurerm_resource_group" "this" {
 
 data "azurerm_client_config" "current" {}
 
+resource "random_string" "global_name_suffix" {
+  length  = 4
+  upper   = false
+  special = false
+}
+
 locals {
   prefix = "${var.project_name}-${var.environment}"
   tags = merge(var.tags, {
@@ -22,7 +28,7 @@ resource "azurerm_log_analytics_workspace" "this" {
 }
 
 resource "azurerm_container_registry" "this" {
-  name                          = substr(replace("acr${local.prefix}", "-", ""), 0, 50)
+  name                          = "${substr(replace("acr${local.prefix}", "-", ""), 0, 45)}${random_string.global_name_suffix.result}"
   resource_group_name           = data.azurerm_resource_group.this.name
   location                      = var.location
   sku                           = "Basic"
@@ -32,7 +38,7 @@ resource "azurerm_container_registry" "this" {
 }
 
 resource "azurerm_key_vault" "this" {
-  name                          = substr("kv-${local.prefix}", 0, 24)
+  name                          = "${substr(replace("kv${local.prefix}", "-", ""), 0, 20)}${random_string.global_name_suffix.result}"
   location                      = var.location
   resource_group_name           = data.azurerm_resource_group.this.name
   tenant_id                     = data.azurerm_client_config.current.tenant_id
@@ -42,6 +48,12 @@ resource "azurerm_key_vault" "this" {
   soft_delete_retention_days    = 7
   public_network_access_enabled = true
   tags                          = local.tags
+
+  network_acls {
+    bypass         = "AzureServices"
+    default_action = "Deny"
+    ip_rules       = var.key_vault_operator_ip_ranges
+  }
 }
 
 resource "azurerm_user_assigned_identity" "runtime" {
@@ -69,6 +81,38 @@ resource "azurerm_container_app_environment" "this" {
   resource_group_name        = data.azurerm_resource_group.this.name
   log_analytics_workspace_id = azurerm_log_analytics_workspace.this.id
   tags                       = local.tags
+}
+
+resource "azurerm_monitor_diagnostic_setting" "key_vault" {
+  name                       = "send-to-log-analytics"
+  target_resource_id         = azurerm_key_vault.this.id
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.this.id
+
+  enabled_log {
+    category = "AuditEvent"
+  }
+
+  enabled_metric {
+    category = "AllMetrics"
+  }
+}
+
+resource "azurerm_monitor_diagnostic_setting" "container_registry" {
+  name                       = "send-to-log-analytics"
+  target_resource_id         = azurerm_container_registry.this.id
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.this.id
+
+  enabled_log {
+    category = "ContainerRegistryLoginEvents"
+  }
+
+  enabled_log {
+    category = "ContainerRegistryRepositoryEvents"
+  }
+
+  enabled_metric {
+    category = "AllMetrics"
+  }
 }
 
 resource "azurerm_container_app" "api" {

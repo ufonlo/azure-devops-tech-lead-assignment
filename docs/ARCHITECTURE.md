@@ -23,21 +23,58 @@ The workload is described as one containerized API and the team is small. Contai
 
 ## Security boundaries
 
-- GitHub authenticates with federated OIDC subjects scoped to repository, branch/pull request and GitHub environment.
+- GitHub authenticates with immutable, numeric-owner/repository OIDC subjects
+  scoped to the pull request, `main` branch or GitHub environment.
+- Terraform jobs set `ARM_CLIENT_ID`, `ARM_TENANT_ID`, `ARM_SUBSCRIPTION_ID` and
+  `ARM_USE_OIDC=true`, so both the AzureRM backend and provider request fresh
+  GitHub OIDC tokens directly. `azure/login` remains available for Azure CLI
+  operations such as saved-plan upload and download; Terraform does not reuse
+  its short-lived federated assertion.
 - Runtime uses a user-assigned managed identity.
 - `AcrPull` and `Key Vault Secrets User` are granted to runtime; no registry password is exposed.
 - Terraform receives secret identifiers, not secret values.
+- Container Apps must contain Key Vault references only, never plain secret
+  values. The Terraform plan identities can call `listSecrets` because the
+  AzureRM provider requires it during refresh, so values stored directly on a
+  Container App would be exposed to pull-request plans.
+- Key Vault denies unmatched public data-plane traffic. Temporary operator access
+  can be supplied as explicit IPv4/CIDR ranges. Before the application consumes
+  Key Vault references, integrate the Container Apps environment with a VNet and
+  add either a Key Vault private endpoint or an appropriate subnet network rule.
 - Production uses a dedicated GitHub environment with required reviewers.
-- State storage disables public blob access and uses Azure RBAC.
+- State storage disables public blob access, uses Azure RBAC, blob versioning,
+  seven-day soft delete, and a `CanNotDelete` account lock.
+- Deployment identities may delegate only `AcrPull` and `Key Vault Secrets User`;
+  the RBAC administrator assignment is constrained with an Azure ABAC condition.
 
 ## State and environments
 
-Bootstrap creates a private state storage account/container plus environment resource groups and deployment identities. Each root module uses a distinct key:
+Bootstrap creates one private state container per environment plus a private,
+seven-day `tfplans` container. A dedicated pull-request identity can read state
+and refresh environment resources through the custom `api-platform Terraform
+Plan Reader` role. The role adds only Container Apps `listSecrets` to normal
+Azure control-plane reads. The main-branch plan identity has the same refresh
+access and can write saved plans, but cannot change state. Each deployer writes
+only its own environment state.
+The shared platform root receives a distinct backend container and key at init time for each environment:
 
-- `job-radar/dev.tfstate`
-- `job-radar/prod.tfstate`
+- `tfstate-dev/api-platform/dev.tfstate`
+- `tfstate-prod/api-platform/prod.tfstate`
 
-State locking is handled by the AzureRM backend. Production and development never share a root state.
+PR plans use `-lock=false` because their identity is read-only and their results
+are updated in one sticky PR comment per environment. Main-branch plans are
+uploaded directly to Azure Storage instead of becoming GitHub artifacts. Each
+apply job downloads its environment plan, verifies the published SHA-256 and
+applies it without recalculating; production first waits for environment approval.
+
+The `CanNotDelete` lock applies to ARM control-plane operations at the storage
+account scope. With AzureRM 4.x containers use `storage_account_id`, so deleting
+a container through ARM is blocked; inherited account-scope role assignments can
+also fail deletion with `ScopeLocked`. Bootstrap migration therefore needs two
+passes: remove the legacy container and account-scope assignments first, then
+create the lock. Removing an environment or destroying bootstrap later requires
+removing the lock first. Data-plane blob writes remain governed by data-plane
+RBAC, versioning, soft delete, and lifecycle policy.
 
 ## Reliability and cost
 

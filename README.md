@@ -19,8 +19,7 @@ docs/                    architecture, onboarding, work plan and CTO summary
 infrastructure/
   bootstrap/             one-time state and OIDC bootstrap
   modules/api-platform/  reusable application platform module
-  environments/dev/      development composition
-  environments/prod/     production composition
+  platform/              shared environment root and per-environment tfvars
 AI_USAGE.md              transparent AI usage log
 ```
 
@@ -28,18 +27,19 @@ AI_USAGE.md              transparent AI usage log
 
 1. A feature branch opens a pull request.
 2. CI runs formatting, validation, lint/security checks and environment plans.
-3. Plan summaries are attached to the workflow summary for review before merge.
-4. Merge to `main` deploys development.
-5. Production is a separate workflow_dispatch deployment protected by the GitHub `production` environment and required reviewers.
+3. One sticky PR comment per environment is created or updated with its plan;
+   binary plans are never uploaded as GitHub artifacts.
+4. Merge to `main` plans and applies development, then creates the production plan.
+5. The same run pauses at the protected GitHub `production` environment. After a
+   required reviewer approves it, production verifies the saved plan checksum and
+   applies that exact plan without recalculating it.
 
 ## Local validation
 
 ```bash
 terraform fmt -check -recursive infrastructure
-terraform -chdir=infrastructure/environments/dev init -backend=false
-terraform -chdir=infrastructure/environments/dev validate
-terraform -chdir=infrastructure/environments/prod init -backend=false
-terraform -chdir=infrastructure/environments/prod validate
+terraform -chdir=infrastructure/platform init -backend=false
+terraform -chdir=infrastructure/platform validate
 ```
 
 No Azure resources are required for static validation. See [day-one setup](docs/DAY_ONE.md) before running a real plan.

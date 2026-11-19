@@ -8,8 +8,8 @@ variable "environment" {
   description = "Deployment environment."
 
   validation {
-    condition     = contains(["dev", "prod"], var.environment)
-    error_message = "environment must be dev or prod."
+    condition     = can(regex("^[a-z][a-z0-9-]{1,10}[a-z0-9]$", var.environment))
+    error_message = "environment must be 3-12 lowercase alphanumeric or hyphen characters, start with a letter, and end with an alphanumeric character."
   }
 }
 
@@ -57,6 +57,12 @@ variable "key_vault_secret_uris" {
   type        = map(string)
   description = "Map of Container Apps secret name to versionless Key Vault secret URI. Values are references, never secret values."
   default     = {}
+}
+
+variable "key_vault_operator_ip_ranges" {
+  type        = list(string)
+  description = "Public IPv4 addresses or CIDR ranges allowed to access the Key Vault data plane for operator tasks."
+  default     = []
 }
 
 variable "secret_environment_variables" {
