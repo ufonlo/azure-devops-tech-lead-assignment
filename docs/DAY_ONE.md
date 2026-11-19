@@ -162,7 +162,9 @@ list and result checks. No new workflow file is required.
 ## 5. Team conventions for humans and AI
 
 Repository safety boundaries, workflow conventions and required checks are
-defined in [`AGENTS.md`](../AGENTS.md). Human and AI contributors follow the
-same validation and review process; disclose material AI assistance in the pull
-request.
+defined in [`AGENTS.md`](../AGENTS.md).
+
+- Never paste credentials, secret values, state, plan files or client data into prompts.
+- The engineer who opens the pull request owns every merged line, regardless of who drafted it.
+- Disclose material AI assistance in the pull-request template's AI section.
 

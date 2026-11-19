@@ -18,6 +18,7 @@ terraform -chdir=infrastructure/bootstrap init -backend=false
 terraform -chdir=infrastructure/bootstrap validate
 terraform -chdir=infrastructure/platform init -backend=false
 terraform -chdir=infrastructure/platform validate
+tflint --init --config "$PWD/.tflint.hcl"
 tflint --recursive --config "$PWD/.tflint.hcl"
 trivy config infrastructure
 ```

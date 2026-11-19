@@ -6,13 +6,13 @@ Reference implementation for deploying a containerized API to Azure with Terrafo
 
 | Assignment deliverable | Location |
 |---|---|
-| Azure architecture and data flow | [Architecture](docs/ARCHITECTURE.md) |
-| Terraform implementation | [`infrastructure/`](infrastructure/) |
-| CI/CD design and implementation | [GitHub Actions workflows](.github/workflows/) and [day-one setup](docs/DAY_ONE.md) |
-| Team work plan | [Remaining work](docs/WORK_PLAN.md) |
-| Pull-request review | [PR review](docs/PR_REVIEW.md) |
-| CTO summary | [CTO summary](docs/CTO_SUMMARY.md) |
-| AI usage and rollout approach | [AI usage disclosure](AI_USAGE.md) |
+| Infrastructure | [`infrastructure/`](infrastructure/) and [architecture](docs/ARCHITECTURE.md) |
+| CI/CD | [`.github/workflows/`](.github/workflows/) |
+| Team setup (including AI assistant conventions) | [Day-one setup](docs/DAY_ONE.md) and [AI assistant conventions](AGENTS.md) |
+| Work plan | [Work plan](docs/WORK_PLAN.md) |
+| PR review | [PR review](docs/PR_REVIEW.md) |
+| Client summary | [Client summary](docs/CTO_SUMMARY.md) |
+| AI usage | [AI usage](AI_USAGE.md) |
 
 ## Decision summary
 
