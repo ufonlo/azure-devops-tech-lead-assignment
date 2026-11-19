@@ -156,13 +156,13 @@ Actions to create and approve pull requests.
 To add another environment, add `envs/<name>.tfvars`, add the environment to
 the bootstrap `environments` map, create its GitHub Environment with an
 `AZURE_CLIENT_ID` variable, then add one reusable-workflow call to both the PR
-and main workflows. No new workflow file is required.
+and main workflows. Add the new plan job to the `required-checks` job's `needs`
+list and result checks. No new workflow file is required.
 
 ## 5. Team conventions for humans and AI
 
-- Never paste credentials, secret values, state files or client data into prompts or source control.
-- AI may draft code and explanations; an engineer owns every line merged.
-- Ask for small diffs and state explicit invariants: no resource deletion, no permission expansion, no environment coupling.
-- Run deterministic tools after AI edits: format, validate, security scan and plan.
-- Record meaningful AI use in the PR and update `AI_USAGE.md` for assignment-level work.
+Repository safety boundaries, workflow conventions and required checks are
+defined in [`AGENTS.md`](../AGENTS.md). Human and AI contributors follow the
+same validation and review process; disclose material AI assistance in the pull
+request.
 
