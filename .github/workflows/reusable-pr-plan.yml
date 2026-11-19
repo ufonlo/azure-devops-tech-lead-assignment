@@ -70,20 +70,78 @@ jobs:
         env:
           ENVIRONMENT_NAME: ${{ inputs.environment }}
           PLAN_OUTCOME: ${{ steps.plan.outcome }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
+          plan_file="${RUNNER_TEMP}/${ENVIRONMENT_NAME}.txt"
+          comment_file="${RUNNER_TEMP}/${ENVIRONMENT_NAME}-comment.md"
+
           {
-            echo 'body<<TERRAFORM_PLAN_COMMENT'
             echo "## Terraform plan: \`${ENVIRONMENT_NAME}\`"
             echo
             echo "Result: **${PLAN_OUTCOME}**"
             echo
-            echo '<details><summary>Show plan output</summary>'
-            echo
-            echo '```text'
-            tail -n 200 "${RUNNER_TEMP}/${ENVIRONMENT_NAME}.txt" 2>/dev/null || echo "Plan output was not produced."
-            echo '```'
-            echo '</details>'
-            echo 'TERRAFORM_PLAN_COMMENT'
+          } > "${comment_file}"
+
+          if [[ ! -f "${plan_file}" ]]; then
+            {
+              echo "Terraform did not produce plan output."
+              echo
+              echo "[Open the workflow run](${RUN_URL})"
+            } >> "${comment_file}"
+          elif (( $(wc -c < "${plan_file}") <= 58000 )); then
+            {
+              echo '<details open><summary>Show full plan output</summary>'
+              echo
+              echo '```text'
+              cat "${plan_file}"
+              echo '```'
+              echo '</details>'
+              echo
+              echo "[Open the workflow run](${RUN_URL})"
+            } >> "${comment_file}"
+          else
+            summary_file="${RUNNER_TEMP}/${ENVIRONMENT_NAME}-summary.txt"
+            truncated_file="${RUNNER_TEMP}/${ENVIRONMENT_NAME}-truncated.txt"
+
+            grep -E '^[[:space:]]*# .* (will be (created|updated in-place|destroyed)|must be replaced)' "${plan_file}" > "${summary_file}" || true
+            grep -E '^Plan: ' "${plan_file}" >> "${summary_file}" || true
+            awk -v max=48000 '
+              {
+                next_length = used + length($0) + 1
+                if (next_length > max) exit
+                print
+                used = next_length
+              }
+            ' "${plan_file}" > "${truncated_file}"
+
+            {
+              echo "> [!WARNING]"
+              echo "> The full plan exceeds the GitHub comment limit and was truncated. [Open the workflow run](${RUN_URL}) for the complete output."
+              echo
+              echo '### Change summary'
+              echo
+              echo '```text'
+              if [[ -s "${summary_file}" ]]; then
+                cat "${summary_file}"
+              else
+                echo 'No Terraform resource summary was found in the plan output.'
+              fi
+              echo '```'
+              echo
+              echo '<details><summary>Show truncated plan output</summary>'
+              echo
+              echo '```text'
+              cat "${truncated_file}"
+              echo '```'
+              echo '</details>'
+            } >> "${comment_file}"
+          fi
+
+          delimiter="TERRAFORM_PLAN_COMMENT_$(date +%s)_${RANDOM}"
+          {
+            echo "body<<${delimiter}"
+            cat "${comment_file}"
+            echo "${delimiter}"
           } >> "$GITHUB_OUTPUT"
       - name: Fail when Terraform plan failed
         if: steps.plan.outcome != 'success'

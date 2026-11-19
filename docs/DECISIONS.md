@@ -98,3 +98,26 @@ a stale lease or restore a protected blob version. Every use should be deliberat
 audited and removed when no longer required. In production this would be assigned
 to a PIM-eligible Entra group rather than retained as a standing user role.
 
+## ADR-010 — Run the production Container Apps environment in West Europe
+
+**Decision:** while this project uses the Free Trial subscription, place only the
+production Container Apps managed environment in West Europe. Keep the production
+resource group, managed identity, ACR, purge-protected Key Vault and Log Analytics
+workspace in North Europe. The Container App follows its managed environment.
+
+**Reason:** the subscription permits one Container Apps managed environment per
+region, and development already consumes the North Europe quota. The first
+production deployment consequently failed with
+`MaxNumberOfRegionalEnvironmentsInSubExceeded`. Moving all production resources
+would create unnecessary replacements and cannot safely replace the purge-protected
+vault.
+
+**Trade-offs:** images are pulled across regions from ACR, telemetry is ingested
+across regions into Log Analytics, calls to North Europe dependencies gain a small
+amount of latency, and cross-region data transfer may add a small charge.
+
+**Production path:** use separate Azure subscriptions for development and
+production, or request a managed-environment quota increase. After either change,
+remove `container_apps_location` from `prod.tfvars` so Container Apps uses the
+normal environment location again.
+
