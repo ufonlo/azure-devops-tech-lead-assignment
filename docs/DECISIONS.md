@@ -144,7 +144,10 @@ A final job that always exists avoids required checks being left pending while
 still preserving conditional execution of expensive or privileged jobs.
 
 **Trade-off:** Dependabot action-only updates can merge without an Azure plan on
-the pull request because the bot has a read-only workflow token and no trusted
-OIDC token. The risk is mitigated by full-SHA action pins, static validation, the
-development-first deployment on `main`, and the approval-gated production run.
+the pull request. Dependabot runs receive a read-only `GITHUB_TOKEN`, so the
+sticky plan comment cannot be posted, and the project deliberately does not give
+bot-authored dependency updates Azure credentials because a compromised
+dependency or action could use them. The risk is mitigated by full-SHA action
+pins, static validation, the development-first deployment on `main`, and the
+approval-gated production run.
 

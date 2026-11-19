@@ -141,11 +141,13 @@ Actions to create and approve pull requests.
    cannot pass the gate when Terraform or workflows change because GitHub does
    not issue their jobs a trusted Azure OIDC token; a maintainer must reproduce
    such a change on a branch in this repository.
-   Dependabot PRs skip Azure plans because their workflow token is read-only and
-   they have no trusted OIDC token; `required-checks` accepts that exception. The
-   updated actions are first exercised by the main run on development before the
-   approval-gated production run. A maintainer who wants plans on the PR can push
-   a commit to the Dependabot branch.
+   Dependabot PRs skip Azure plans because their runs receive a read-only
+   `GITHUB_TOKEN`, so the sticky plan comment cannot be posted, and this project
+   deliberately does not give bot-authored dependency updates Azure credentials:
+   a compromised dependency or action could use them. `required-checks` accepts
+   that exception. The updated actions are first exercised by the main run on
+   development before the approval-gated production run. A maintainer who wants
+   plans on the PR can push a commit to the Dependabot branch.
 4. Merge only after the plan is understood.
 5. Confirm main plans and applies development, then plans production.
 6. Approve the `production` environment and verify that the exact plan stored

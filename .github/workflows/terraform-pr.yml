@@ -27,7 +27,7 @@ jobs:
           changed_files="$(
             gh api --paginate \
               "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files" \
-              --jq '.[].filename'
+              --jq '.[] | .filename, (.previous_filename // empty)'
           )"
 
           terraform=false
@@ -165,7 +165,7 @@ jobs:
                   gate_failed=true
                 fi
               done
-              echo "decision: Dependabot Azure plans may be skipped because its pull request has no trusted OIDC token."
+              echo "decision: Azure plans are intentionally not run for Dependabot pull requests."
             else
               if [[ "$PLAN_DEV_RESULT" != "success" || "$PLAN_PROD_RESULT" != "success" ]]; then
                 echo "ERROR: both Azure plans must succeed for a same-repository pull request."
