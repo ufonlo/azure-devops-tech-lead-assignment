@@ -4,8 +4,8 @@ AI was used to implement and review this assignment. It did not approve or opera
 
 ## Tools and roles
 
-- **OpenAI Codex:** performed the first analysis of the assignment, implemented the Terraform, workflows and documentation in this repository, and made the commits.
-- **Claude Code (Anthropic):** acted as an independent reviewer and planner. It reviewed the repository, wrote the step-by-step prompts given to Codex, and verified each step read-only using diffs, real Terraform plans against the personal subscription, Azure resource state and the GitHub API. It never applied, pushed or merged a change.
+- **OpenAI Codex:** performed the first analysis of the assignment, implemented the Terraform, workflows and documentation in this repository, and made the commits, apart from the final clean-up described below.
+- **Claude Code (Anthropic):** acted as an independent reviewer and planner. It reviewed the repository, wrote the step-by-step prompts given to Codex, and verified each step read-only using diffs, real Terraform plans against the personal subscription, Azure resource state and the GitHub API. It never applied, pushed or merged a change. In the final clean-up, with my approval, it wrote the last documentation edits itself (committed locally, pushed by me) and used the GitHub CLI to update pull-request descriptions and repository metadata and to delete merged branches.
 - **Human:** applied bootstrap, configured the GitHub environments and ruleset, pushed and merged every pull request, and approved every production run.
 
 ## Prompts that materially affected the result
